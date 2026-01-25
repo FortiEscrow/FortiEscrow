@@ -1,94 +1,36 @@
-# Contributing to FortiEscrow
+# Contributing
 
-Thank you for your interest in contributing!
-
-## Code of Conduct
-
-Be respectful, inclusive, and professional.
-
-## How to Contribute
-
-### Reporting Bugs
-1. Check existing issues first
-2. Use bug report template
-3. Include reproduction steps
-4. Attach error logs
-
-### Security Issues
-**Do not open public issues for security vulnerabilities**
-1. Email: security@example.com
-2. Include details and proof of concept
-3. Allow 48 hours for response
-
-### Feature Requests
-1. Use feature request template
-2. Explain use case
-3. Discuss implementation approach
-4. Label as core or variant
-
-### Code Contributions
-
-#### Setup
+## Setup
 ```bash
-git clone <repo>
-cd FortiEscrow-Labs
+git clone https://github.com/maniknur/FortiEscrow.git
+cd FortiEscrow
 make install
 ```
 
-#### Development
+## Development
 ```bash
-# Make your changes
-# Write tests
-# Run tests
-make test
-
-# Check coverage
-make coverage
+make test       # Run tests
+make coverage   # Check coverage
+make lint       # Lint code
 ```
 
-#### Submission
-1. Create feature branch: `git checkout -b feature/my-feature`
-2. Commit changes: `git commit -am 'Add feature'`
-3. Push to branch: `git push origin feature/my-feature`
-4. Open pull request with description
-
-## Standards
-
-### Code Quality
-- Follow existing code style
-- Add comments for complex logic
-- Include docstrings
-- Write security-first code
-
-### Testing
+## Before PR
+- Write tests for new code
 - Maintain 100% test coverage
-- Add tests for new features
-- Test edge cases and errors
-- Include security tests
+- Update docs if needed
+- Commit messages in English
 
-### Documentation
-- Update relevant docs
-- Add examples if applicable
-- Document security implications
-- Update CHANGELOG.md
+## Security
+Found vulnerability? Email security@example.com (do NOT open public issues)
 
-## Development Process
+## Issues
+- Use templates
+- Search existing issues first
+- Provide reproduction steps
 
-1. **Discuss First**: Open issue to discuss changes
-2. **Fork & Branch**: Create feature branch
-3. **Code & Test**: Implement with tests
-4. **Security Review**: Ensure security properties hold
-5. **Documentation**: Update docs
-6. **Submit PR**: Include detailed description
-7. **Iterate**: Address feedback
-8. **Merge**: Approved by maintainers
-
-## Questions?
-
-- Check docs: https://github.com/yourusername/FortiEscrow-Labs/docs
-- Open discussion: https://github.com/yourusername/FortiEscrow-Labs/discussions
-- Email: contact@example.com
+## Need Help?
+Check [FRAMEWORK_AUDIT.md](FRAMEWORK_AUDIT.md) for project status and roadmap.
 
 ---
 
-**Thank you for contributing to FortiEscrow!**
+**Thank you!**
