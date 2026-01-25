@@ -1,0 +1,24 @@
+name: Security Audit
+
+on: [push, pull_request]
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install smartpy pytest bandit
+    
+    - name: Run security tests
+      run: python -m pytest tests/security/ -v
+    
+    - name: Run bandit (linting)
+      run: bandit -r contracts/ -f json -o bandit-report.json
