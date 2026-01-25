@@ -1,3 +1,12 @@
-smartpy>=0.14.0
+# SmartPy - Install from source (not available on PyPI)
+# git clone https://github.com/smartpy-io/smartpy.git
+# cd smartpy && python3 -m pip install -e .
+
+# Test dependencies
 pytest>=6.0.0
 pytest-cov>=2.10.0
+
+# Optional: Development tools
+black>=21.0
+pylint>=2.10.0
+mypy>=0.900
