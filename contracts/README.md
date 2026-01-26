@@ -1,105 +1,162 @@
-# FortiEscrow Contracts
+# Contracts
 
-Core smart contract implementations for the FortiEscrow framework.
+Smart contract implementations for the FortiEscrow framework.
 
 ## Structure
 
-- **`core/`** - Base escrow contract (immutable, audited)
-- **`variants/`** - Framework extensions (token, atomic swap, milestone-based)
-- **`interfaces/`** - Shared types, errors, events
-- **`utils/`** - Utility adapters (amount validation, timeline management)
+```
+contracts/
+├── core/
+│   ├── escrow_base.py          # Base contract + SimpleEscrow
+│   ├── escrow_factory.py       # Factory deployment pattern
+│   ├── escrow_multisig.py      # Multi-signature variant
+│   └── forti_escrow.py         # Legacy (deprecated)
+├── interfaces/
+│   ├── types.py                # Type definitions
+│   ├── errors.py               # Error codes
+│   └── events.py               # Event definitions
+├── utils/
+│   ├── validators.py           # Input validators
+│   ├── amount_validator.py     # Amount validation
+│   └── timeline_manager.py     # Timeout utilities
+├── adapters/
+│   └── escrow_adapter.py       # Adapter base class
+├── variants/
+│   ├── atomic_swap/            # HTLC escrow
+│   ├── milestone/              # Phased release
+│   └── token/                  # FA1.2/FA2 support
+├── invariants.py               # Formal invariant definitions
+└── invariants_enforcement.py   # Invariant checking
+```
 
 ## Core Contract
 
-The main escrow contract in `core/forti_escrow.py` implements:
+**Location**: `core/escrow_base.py`
 
-- Explicit finite state machine (INIT → FUNDED → RELEASED/REFUNDED)
-- No super-admin or unilateral fund control
-- Anti-fund-locking via timeout recovery
-- Comprehensive security checks on all entrypoints
+### Storage
 
-**Status**: ✅ Audited, production-ready
+| Field | Type | Description |
+|-------|------|-------------|
+| depositor | address | Funds escrow, controls release/refund |
+| beneficiary | address | Receives funds on release |
+| escrow_amount | nat | Required funding amount (mutez) |
+| timeout_seconds | nat | Duration before force_refund available |
+| state | int | FSM state: 0=INIT, 1=FUNDED, 2=RELEASED, 3=REFUNDED |
+| funded_at | timestamp | Time when funded |
+| deadline | timestamp | funded_at + timeout_seconds |
 
-## Variants
+### State Machine
 
-Framework extensions in `variants/`:
+```
+INIT ──[fund]──> FUNDED ──[release]──> RELEASED (terminal)
+                    │
+                    └──[refund]──────> REFUNDED (terminal)
+                    └──[force_refund]─> REFUNDED (after timeout)
+```
 
-- **Token Variant** (`token/`) - FA1.2/FA2 token escrow
-- **Atomic Swap** (`atomic_swap/`) - Cross-chain HTLC variant
-- **Milestone** (`milestone/`) - Staged release mechanism
+### Entrypoints
 
-Each variant extends core logic without modifying it.
+| Entrypoint | Transition | Authorization | Condition |
+|------------|------------|---------------|-----------|
+| fund() | INIT → FUNDED | depositor | amount == escrow_amount |
+| release() | FUNDED → RELEASED | depositor | now <= deadline |
+| refund() | FUNDED → REFUNDED | depositor | - |
+| force_refund() | FUNDED → REFUNDED | anyone | now > deadline |
 
-## Interfaces
+### Views
 
-Shared definitions in `interfaces/`:
-
-- **`types.py`** - Type definitions for all contracts
-- **`errors.py`** - Centralized error codes
-- **`events.py`** - Event definitions
-
-Single source of truth prevents inconsistencies.
-
-## Utilities
-
-Helper functions in `utils/`:
-
-- **`amount_validator.py`** - Amount validation adapters
-- **`timeline_manager.py`** - Timeout and timeline helpers
-
-Utilities are reusable across variants.
-
----
+| View | Returns |
+|------|---------|
+| get_status() | state, parties, amount, deadline, flags |
+| get_parties() | depositor, beneficiary |
+| get_timeline() | funded_at, deadline, timeout_seconds, is_expired |
 
 ## Usage
 
-### Import Core Contract
+### SimpleEscrow
 
 ```python
-from contracts.core import forti_escrow
+from contracts.core.escrow_base import SimpleEscrow
+import smartpy as sp
 
-contract = forti_escrow.FortiEscrow(
-    depositor=sp.address("tz1..."),
-    beneficiary=sp.address("tz1..."),
-    relayer=sp.address("tz1..."),
-    escrow_amount=sp.nat(1_000_000),
-    timeout_seconds=sp.nat(7*24*3600)
+escrow = SimpleEscrow(
+    depositor=sp.address("tz1Alice..."),
+    beneficiary=sp.address("tz1Bob..."),
+    amount=sp.nat(5_000_000),
+    timeout_seconds=sp.nat(604800)
 )
 ```
 
-### Create a Variant
+### MultisigEscrow
 
 ```python
-from contracts.variants.token import forti_escrow_token
+from contracts.core.escrow_multisig import MultisigEscrow
 
-# Extends core logic with token support
-contract = forti_escrow_token.FortiEscrowToken(...)
-```
-
-### Use Utilities
-
-```python
-from contracts.utils import amount_validator, timeline_manager
-
-# Validate amounts
-amount_validator.validate_positive_amount(sp.nat(1_000_000))
-
-# Check timeouts
-is_expired = timeline_manager.is_timeout_expired(
-    funded_timestamp, timeout_seconds
+escrow = MultisigEscrow(
+    depositor=sp.address("tz1Alice..."),
+    beneficiary=sp.address("tz1Bob..."),
+    arbiter=sp.address("tz1Charlie..."),
+    amount=sp.nat(5_000_000),
+    timeout_seconds=sp.nat(604800),
+    required_signatures=sp.nat(2)
 )
 ```
 
----
+### Factory Deployment
 
-## Security Considerations
+```python
+from contracts.core.escrow_factory import EscrowFactory
 
-- Core contract path (`core/`) = immutable after audit
-- Variant paths = versioned and monitored
-- All changes tracked in `CHANGELOG.md`
-- See `/security/` for invariants and threat model
+factory = EscrowFactory()
+# Deploy multiple escrows with consistent configuration
+```
 
----
+## Error Codes
 
-**Version**: 1.0.0  
-**Last Updated**: January 25, 2026
+| Code | Description |
+|------|-------------|
+| ESCROW_INVALID_STATE | Invalid state for operation |
+| ESCROW_NOT_DEPOSITOR | Sender is not depositor |
+| ESCROW_AMOUNT_MISMATCH | Amount != escrow_amount |
+| ESCROW_TIMEOUT_NOT_EXPIRED | Deadline not passed |
+| ESCROW_DEADLINE_PASSED | Release window closed |
+| ESCROW_SAME_PARTY | depositor == beneficiary |
+| ESCROW_ZERO_AMOUNT | amount == 0 |
+| ESCROW_TIMEOUT_TOO_SHORT | timeout < 1 hour |
+| ESCROW_TIMEOUT_TOO_LONG | timeout > 1 year |
+
+## Security Invariants
+
+1. **Funds Safety**: Transfers only in terminal states
+2. **State Consistency**: Valid FSM transitions only
+3. **Authorization**: Enforced sender checks
+4. **Time Safety**: Funds recoverable after deadline
+5. **No Fund-Locking**: Multiple exit paths guaranteed
+
+## Variants
+
+| Variant | Description |
+|---------|-------------|
+| atomic_swap/ | Hash time-locked contract for cross-chain swaps |
+| milestone/ | Multi-phase release with intermediate checkpoints |
+| token/ | FA1.2/FA2 token support instead of XTZ |
+
+## Testing
+
+```bash
+pytest tests/ -v
+```
+
+## Deprecation Notice
+
+`core/forti_escrow.py` is deprecated. Use `core/escrow_base.py` instead.
+
+**Reason**: forti_escrow.py calculates deadline at deployment time. escrow_base.py calculates deadline at funding time (correct behavior).
+
+```python
+# Deprecated
+from contracts.core.forti_escrow import FortiEscrow
+
+# Recommended
+from contracts.core.escrow_base import SimpleEscrow
+```

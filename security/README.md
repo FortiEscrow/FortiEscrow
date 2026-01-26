@@ -1,75 +1,148 @@
-# FortiEscrow Security
+# Security
 
-Security analysis, threat modeling, and formal invariants.
+Security analysis and formal invariants for FortiEscrow.
 
-## Structure
-
-- **`invariants/`** - Formal proofs of security properties
-- **`threat_model/`** - Attack surface analysis and mitigations
+For a comprehensive overview, see [docs/SECURITY.md](../docs/SECURITY.md).
 
 ## Invariants
 
-Formal proofs that security properties hold:
+FortiEscrow enforces five security invariants. These are runtime-enforced constraints, not guidelines.
 
-- **`state_machine.md`** - FSM invariant proofs
-- **`fund_invariants.md`** - Fund conservation proofs
-- **`authorization_invariants.md`** - Authorization invariant proofs
-- **`timeout_invariants.md`** - Timeout mechanism proofs
+### Invariant 1: Funds Safety
 
-### Reading Invariants
+Funds can only be transferred when the contract reaches a terminal state.
 
-Each invariant file contains:
+```
+∀t: transfer(amount) → state(t) ∈ {RELEASED, REFUNDED}
+```
 
-1. **Property Statement** - What security property is proven
-2. **Assumptions** - What conditions must hold
-3. **Proof** - Mathematical/logical proof
-4. **Code References** - Where in code is this enforced
-5. **Test Cases** - How is this verified
+**Enforcement**: State changes to terminal before `sp.send()` in all entrypoints.
 
-## Threat Model
+**Location**: `escrow_base.py:335-338` (release), `escrow_base.py:371-374` (refund)
 
-Comprehensive attack surface analysis:
+### Invariant 2: State Consistency
 
-- **`stride_analysis.md`** - STRIDE analysis matrix
-- **`attack_vectors.md`** - 20+ documented attack vectors
-- **`mitigations.md`** - Mitigation strategy for each attack
-- **`risk_matrix.md`** - Risk assessment and severity
+State transitions follow the FSM exactly. No backward transitions.
 
-### Reading Threat Model
+```
+INIT → FUNDED → {RELEASED | REFUNDED}
+```
 
-Start with `stride_analysis.md` for quick overview, then dig into specific attacks in `attack_vectors.md`.
+**Enforcement**: Every entrypoint verifies current state before modification.
+
+**Location**: `escrow_base.py:207-209` (`_require_state`)
+
+### Invariant 3: Authorization
+
+Only authorized parties can execute privileged operations.
+
+| Operation | Authorized Caller |
+|-----------|-------------------|
+| fund | depositor |
+| release | depositor |
+| refund | depositor |
+| force_refund | anyone (after timeout) |
+
+**Enforcement**: `sp.verify(sp.sender == depositor)` on privileged operations.
+
+**Location**: `escrow_base.py:223-225` (`_require_sender`)
+
+### Invariant 4: Time Safety
+
+Funds are always recoverable after the deadline expires.
+
+```
+∀t ≥ deadline: force_refund() succeeds
+```
+
+**Enforcement**:
+- Deadline = funding_time + timeout_seconds (immutable)
+- Timeout bounds: 1 hour ≤ timeout ≤ 1 year
+
+**Location**: `escrow_base.py:166-176`, `escrow_base.py:405-408`
+
+### Invariant 5: No Permanent Fund-Locking
+
+No execution path results in funds being permanently locked.
+
+**Exit paths from FUNDED**:
+1. `release()` — depositor transfers to beneficiary
+2. `refund()` — depositor reclaims funds
+3. `force_refund()` — anyone recovers funds (after deadline)
+
+**Location**: `escrow_base.py:300-414`
+
+## Threat Catalog
+
+| ID | Threat | Severity | Mitigation |
+|----|--------|----------|------------|
+| T1 | Permanent fund lock | Critical | Timeout recovery, multiple exit paths |
+| T2 | Unauthorized transfer | Critical | Sender authentication |
+| T3 | State manipulation | Critical | State validation per entrypoint |
+| T4 | Double spending | Critical | State transition before transfer |
+| T5 | Reentrancy | High | CEI pattern, Tezos call semantics |
+| T6 | Time manipulation | High | Strict deadline comparison |
+| T7 | Front-running | High | Authorization + idempotency |
+| T8 | Parameter validation | Medium | Constructor validation |
+| T9 | Denial of service | Medium | Idempotent operations |
+| T10 | Insufficient funding | Medium | Exact amount matching |
+
+## Authorization Matrix
+
+| Operation | INIT | FUNDED (pre-deadline) | FUNDED (post-deadline) | Terminal |
+|-----------|------|-----------------------|------------------------|----------|
+| fund | depositor | - | - | - |
+| release | - | depositor | - | - |
+| refund | - | depositor | depositor | - |
+| force_refund | - | - | anyone | - |
+
+## Checks-Effects-Interactions Pattern
+
+All entrypoints follow this order:
+
+```python
+@sp.entry_point
+def release(self):
+    # 1. CHECKS
+    self._require_funded()
+    self._require_sender(self.data.depositor, ...)
+    sp.verify(sp.now <= self.data.deadline, ...)
+
+    # 2. EFFECTS
+    self.data.state = STATE_RELEASED
+
+    # 3. INTERACTIONS
+    sp.send(self.data.beneficiary, sp.balance)
+```
 
 ## Audit Checklist
 
-`audit_checklist.md` - Pre-deployment security checklist
+### State Machine
+- [ ] All entrypoints verify current state
+- [ ] Terminal states have no outgoing transitions
+- [ ] Only valid FSM transitions possible
 
-## Main Documentation
+### Authorization
+- [ ] `release()` requires depositor
+- [ ] `refund()` requires depositor
+- [ ] `force_refund()` requires timeout expiry
+- [ ] No admin backdoors
 
-`SECURITY.md` - Complete security audit report (comprehensive)
+### Funds
+- [ ] `sp.send()` only after state is terminal
+- [ ] No other transfer mechanisms
+- [ ] Exact amount matching enforced
 
----
+### Timing
+- [ ] Deadline set once at funding
+- [ ] No mechanism to extend deadline
+- [ ] Timeout bounds enforced
 
-## Quick Reference
+### Parameters
+- [ ] depositor != beneficiary
+- [ ] amount > 0
+- [ ] timeout within bounds
 
-**Critical Invariants** (all proven):
-1. Valid state transitions only
-2. No unilateral control (except depositor)
-3. Funds always recoverable (anti-locking)
-4. Amount validation (no fund loss)
-5. FSM completeness (no stuck states)
+## Reporting Vulnerabilities
 
-**Critical Threats** (all mitigated):
-- Unauthorized fund release → Sender auth
-- Fund-locking → Timeout recovery
-- Double-funding → State validation
-- Amount discrepancies → Exact match validation
-
-**Critical Guarantees**:
-✅ 0 critical issues  
-✅ 0 high issues  
-✅ 100% test coverage  
-✅ All invariants proven  
-
----
-
-**Last Updated**: January 25, 2026
+Report security vulnerabilities to repository maintainers privately. Do not disclose publicly until a fix is available.

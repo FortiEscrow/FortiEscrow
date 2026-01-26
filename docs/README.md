@@ -1,52 +1,82 @@
-# FortiEscrow Documentation
+# FortiEscrow
 
-Comprehensive documentation organized by audience.
+A reusable escrow smart contract framework for Tezos and Etherlink. FortiEscrow standardizes escrow semantics as a composable trust primitive for decentralized applications.
 
-## Guides
+## Core Properties
 
-### User Guide
-For developers deploying and operating FortiEscrow
+FortiEscrow implements a deterministic finite state machine with the following guarantees:
 
-- `quick_start.md` - 5-minute getting started
-- `deployment_guide.md` - Step-by-step deployment
-- `operation_guide.md` - Operational procedures
+1. **No Super-Admin**: No privileged role can unilaterally control funds
+2. **Anti-Fund-Locking**: Timeout-based permissionless recovery ensures funds are never permanently locked
+3. **Explicit FSM**: All state transitions are validated and deterministic
+4. **Defense in Depth**: Multiple validation layers on every entrypoint
 
-### Developer Guide
-For developers extending FortiEscrow framework
+## State Machine
 
-- `architecture.md` - Architecture overview
-- `extending_framework.md` - How to create variants
-- `code_style.md` - Code conventions and style
+```
+INIT ──[fund]──> FUNDED ──[release]──> RELEASED (terminal)
+                    │
+                    └──[refund]──────> REFUNDED (terminal)
+                    └──[force_refund]─> REFUNDED (terminal, after timeout)
+```
 
-### Security Guide
-For auditors and security reviewers
+## Quick Start
 
-- `threat_model_summary.md` - Quick threat overview
-- `audit_guide.md` - How to audit FortiEscrow
-- `security_checklist.md` - Security review checklist
+```python
+from contracts.core.escrow_base import SimpleEscrow
+import smartpy as sp
 
-## Reference
+escrow = SimpleEscrow(
+    depositor=sp.address("tz1Alice..."),
+    beneficiary=sp.address("tz1Bob..."),
+    amount=sp.nat(5_000_000),        # 5 XTZ in mutez
+    timeout_seconds=sp.nat(604800)   # 7 days
+)
+```
 
-### API Reference
-For integration and development
+## Documentation
 
-- `core_contract.md` - Core contract API
-- `error_codes.md` - All error codes
-- `type_definitions.md` - Type definitions
+| Document | Description |
+|----------|-------------|
+| [SEMANTICS.md](SEMANTICS.md) | State machine, transitions, invariants |
+| [SECURITY.md](SECURITY.md) | Threat model, authorization matrix |
+| [API.md](API.md) | Entrypoints, views, error codes |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Deployment and integration guide |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
 
-### Examples
-Code examples and usage patterns
+## Contract Variants
 
-- `basic_escrow.py` - Simple XTZ escrow
-- `token_escrow.py` - Token escrow variant
-- `atomic_swap.py` - Atomic swap example
+| Variant | Location | Description |
+|---------|----------|-------------|
+| SimpleEscrow | `contracts/core/escrow_base.py` | Basic two-party escrow |
+| MultisigEscrow | `contracts/core/escrow_multisig.py` | Multi-signature release |
+| MilestoneEscrow | `contracts/variants/milestone/` | Phased release |
+| TokenEscrow | `contracts/variants/token/` | FA1.2/FA2 token support |
 
-## Quick Access
+## Project Structure
 
-- `QUICK_REFERENCE.md` - 1-page cheat sheet
-- `FAQ.md` - Frequently asked questions
-- `GLOSSARY.md` - Terminology
+```
+contracts/
+├── core/
+│   ├── escrow_base.py      # Base contract + SimpleEscrow
+│   ├── escrow_multisig.py  # Multi-signature variant
+│   └── escrow_factory.py   # Factory pattern
+├── interfaces/
+│   ├── types.py            # Type definitions
+│   └── errors.py           # Error codes
+└── variants/               # Extended variants
 
----
+tests/
+├── test_fortiescrow.py     # Core test suite
+├── test_invariants.py      # Invariant verification
+└── test_security_fixes.py  # Security regression tests
+```
 
-**Last Updated**: January 25, 2026
+## Requirements
+
+- Python 3.8+
+- SmartPy 0.17+
+
+## License
+
+MIT

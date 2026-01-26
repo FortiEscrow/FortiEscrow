@@ -1,5 +1,28 @@
 """
-FortiEscrow Core Smart Contract
+FortiEscrow Core Smart Contract (DEPRECATED)
+============================================
+
+!!! DEPRECATION WARNING !!!
+This contract is DEPRECATED. Use SimpleEscrow from escrow_base.py instead.
+
+Reason for deprecation:
+    - Deadline is calculated at DEPLOYMENT time, not FUNDING time
+    - If deployment-to-funding delay exceeds timeout, escrow becomes unfundable
+    - escrow_base.py calculates deadline at funding time (correct behavior)
+
+Migration:
+    # OLD (deprecated):
+    from contracts.core.forti_escrow import FortiEscrow
+
+    # NEW (recommended):
+    from contracts.core.escrow_base import SimpleEscrow
+
+The API is identical. Only the deadline calculation differs.
+
+---
+
+Original documentation (for reference):
+
 A reusable, security-first escrow framework on Tezos
 
 Security Principles:
@@ -13,6 +36,15 @@ This contract implements an explicit finite state machine:
          |      |
          └-------> REFUNDED
 """
+
+import warnings
+warnings.warn(
+    "FortiEscrow is deprecated. Use SimpleEscrow from escrow_base.py instead. "
+    "FortiEscrow calculates deadline at deployment time (incorrect), "
+    "SimpleEscrow calculates at funding time (correct).",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 import smartpy as sp
 

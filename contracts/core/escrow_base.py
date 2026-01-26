@@ -30,6 +30,9 @@ STATE_FUNDED = 1
 STATE_RELEASED = 2
 STATE_REFUNDED = 3
 
+# Valid states for bounds checking
+VALID_STATES = [STATE_INIT, STATE_FUNDED, STATE_RELEASED, STATE_REFUNDED]
+
 # State names for human readability
 STATE_NAMES = {
     0: "INIT",
@@ -78,6 +81,9 @@ class EscrowError:
     INVALID_PARAMS = "ESCROW_INVALID_PARAMS"
     SAME_PARTY = "ESCROW_SAME_PARTY"
     INVALID_ADDRESS = "ESCROW_INVALID_ADDRESS"
+
+    # Direct transfer protection
+    DIRECT_TRANSFER_NOT_ALLOWED = "ESCROW_DIRECT_TRANSFER_NOT_ALLOWED"
 
 
 # ==============================================================================
@@ -227,18 +233,24 @@ class EscrowBase(sp.Contract):
         return sp.add_seconds(sp.now, sp.to_int(self.data.timeout_seconds))
 
     def _transfer_to_beneficiary(self):
-        """Transfer escrow funds to beneficiary"""
-        sp.send(
-            self.data.beneficiary,
-            sp.utils.nat_to_mutez(self.data.escrow_amount)
-        )
+        """
+        Transfer ALL contract funds to beneficiary.
+
+        SECURITY FIX: Uses sp.balance instead of escrow_amount to ensure
+        all funds are transferred, preventing any locked funds from
+        direct transfers or dust.
+        """
+        sp.send(self.data.beneficiary, sp.balance)
 
     def _transfer_to_depositor(self):
-        """Transfer escrow funds back to depositor"""
-        sp.send(
-            self.data.depositor,
-            sp.utils.nat_to_mutez(self.data.escrow_amount)
-        )
+        """
+        Transfer ALL contract funds back to depositor.
+
+        SECURITY FIX: Uses sp.balance instead of escrow_amount to ensure
+        all funds are transferred, preventing any locked funds from
+        direct transfers or dust.
+        """
+        sp.send(self.data.depositor, sp.balance)
 
     # ==========================================================================
     # ENTRY POINT: fund()
@@ -400,6 +412,30 @@ class EscrowBase(sp.Contract):
 
         # [TRANSFER] Return funds to depositor
         self._transfer_to_depositor()
+
+    # ==========================================================================
+    # DEFAULT ENTRY POINT: Reject Direct Transfers
+    # ==========================================================================
+
+    @sp.entry_point
+    def default(self):
+        """
+        REJECT all direct XTZ transfers.
+
+        SECURITY: This prevents accidental fund loss from:
+            1. Direct transfers to contract address
+            2. Transfers via default entrypoint
+            3. Any call with attached XTZ that doesn't match fund()
+
+        Why this matters:
+            - Direct transfers would create balance/state desync
+            - Funds sent outside fund() would be locked
+            - This entrypoint ensures only fund() can deposit
+
+        If you want to fund the escrow, call fund() directly.
+        """
+        # Reject ANY amount (even 0, for clarity)
+        sp.failwith(EscrowError.DIRECT_TRANSFER_NOT_ALLOWED)
 
     # ==========================================================================
     # VIEW: get_status()
