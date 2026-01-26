@@ -26,8 +26,8 @@ INIT ──[fund]──> FUNDED ──[release]──> RELEASED (terminal)
 
 ```bash
 pip install smartpy
-git clone https://github.com/your-org/FortiEscrow-Labs.git
-cd FortiEscrow-Labs
+git clone https://github.com/FortiEscrow/FortiEscrow.git
+cd FortiEscrow
 ```
 
 ```python
