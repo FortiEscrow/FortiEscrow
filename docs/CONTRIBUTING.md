@@ -4,7 +4,7 @@
 
 ```bash
 # Clone repository
-git clone https://github.com/your-org/FortiEscrow-Labs.git
+git clone https://github.com/FortiEscrow/FortiEscrow.git
 cd FortiEscrow-Labs
 
 # Install dependencies
