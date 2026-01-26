@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """
-FortiEscrow Framework Reusability Test (PENTING)
-=================================================
+FortiEscrow Framework Reusability Test (CRITICAL)
+==================================================
 
-Menguji kemampuan reusability framework - apakah framework dapat digunakan
-kembali untuk berbagai use case dan integrasi.
+Tests framework reusability - whether the framework can be reused
+for various use cases and integrations.
 
-Kategori Test Reusability:
-    1. MULTI_USECASE - Dapat digunakan untuk berbagai kasus
-    2. EXTENSIBILITY - Dapat diperluas tanpa modifikasi core
-    3. COMPOSABILITY - Komponen dapat dikomposisi
-    4. ADAPTER_PATTERN - Dapat beradaptasi dengan sistem lain
-    5. VARIANT_CREATION - Dapat membuat variant baru
-    6. INTEROPERABILITY - Kompatibel antar platform
-    7. INTEGRATION - Terintegrasi dengan sistem eksternal
+Reusability Test Categories:
+    1. MULTI_USECASE - Can be used for various cases
+    2. EXTENSIBILITY - Can be extended without modifying core
+    3. COMPOSABILITY - Components can be composed
+    4. ADAPTER_PATTERN - Can adapt to different systems
+    5. VARIANT_CREATION - Can create new variants
+    6. INTEROPERABILITY - Compatible across platforms
+    7. INTEGRATION - Integrates with external systems
 
-Filosofi: "Reusable primitive" - Framework harus dapat digunakan
-di berbagai konteks tanpa perlu modifikasi core logic
+Philosophy: "Reusable primitive" - Framework must be usable
+in various contexts without modifying core logic
 """
 
 import sys
@@ -37,7 +37,7 @@ class State(IntEnum):
 # ==============================================================================
 
 class EscrowBase:
-    """Base contract yang dapat digunakan kembali untuk semua variant."""
+    """Base contract that can be reused for all variants."""
     
     def __init__(self, depositor, beneficiary, amount, deadline):
         self.depositor = depositor
@@ -74,7 +74,7 @@ class EscrowBase:
 # ==============================================================================
 
 class SimpleEscrowUsecase(EscrowBase):
-    """Usecase 1: Escrow Sederhana XTZ"""
+    """Usecase 1: Simple XTZ Escrow"""
     
     def __init__(self, depositor, beneficiary, amount, deadline):
         super().__init__(depositor, beneficiary, amount, deadline)
@@ -86,7 +86,7 @@ class SimpleEscrowUsecase(EscrowBase):
 # ==============================================================================
 
 class TokenEscrowUsecase(EscrowBase):
-    """Usecase 2: Token Escrow (FA2/FA1.2) - Extend base dengan token support."""
+    """Usecase 2: Token Escrow (FA2/FA1.2) - Extends base with token support."""
     
     def __init__(self, depositor, beneficiary, amount, deadline, token_address=None, token_id=0):
         super().__init__(depositor, beneficiary, amount, deadline)
@@ -95,15 +95,15 @@ class TokenEscrowUsecase(EscrowBase):
         self.usecase_name = "Token Escrow (FA2)"
     
     def fund(self, sender, amount, now, from_address=None):
-        """Override fund untuk mengecek token ownership."""
+        """Override fund to check token ownership."""
         if from_address is None:
             from_address = sender
         
-        # Verifikasi token ownership
+        # Verify token ownership
         if not self.verify_token_ownership(from_address):
             return False, "Token ownership verification failed"
         
-        # Panggil parent fund logic
+        # Call parent fund logic
         success = super().fund(sender, amount, now)
         if success:
             # Track token source
@@ -111,8 +111,8 @@ class TokenEscrowUsecase(EscrowBase):
         return success, "Token transfer" if success else "Fund failed"
     
     def verify_token_ownership(self, address):
-        """Simulasi verifikasi token ownership."""
-        return True  # Dalam praktik nyata, cek ledger blockchain
+        """Simulate token ownership verification."""
+        return True  # In real implementation, check blockchain ledger
 
 
 # ==============================================================================
@@ -120,7 +120,7 @@ class TokenEscrowUsecase(EscrowBase):
 # ==============================================================================
 
 class MilestoneEscrowUsecase(EscrowBase):
-    """Usecase 3: Escrow Multi-Milestone - Release bertahap."""
+    """Usecase 3: Multi-Milestone Escrow - Staged release."""
     
     def __init__(self, depositor, beneficiary, amount, deadline, milestones=None):
         super().__init__(depositor, beneficiary, amount, deadline)
@@ -130,7 +130,7 @@ class MilestoneEscrowUsecase(EscrowBase):
         self.usecase_name = "Multi-Milestone Escrow"
     
     def release_milestone(self, sender, now, milestone_index):
-        """Release dana untuk milestone tertentu."""
+        """Release funds for a specific milestone."""
         if self.state != State.FUNDED or sender != self.depositor:
             return False, "Invalid sender"
         
@@ -156,7 +156,7 @@ class MilestoneEscrowUsecase(EscrowBase):
 # ==============================================================================
 
 class AtomicSwapUsecase(EscrowBase):
-    """Usecase 4: Atomic Swap - Dua escrow bersinkronisasi."""
+    """Usecase 4: Atomic Swap - Two escrows synchronized."""
     
     def __init__(self, depositor, beneficiary, amount, deadline, pair_contract=None):
         super().__init__(depositor, beneficiary, amount, deadline)
@@ -165,18 +165,18 @@ class AtomicSwapUsecase(EscrowBase):
         self.usecase_name = "Atomic Swap"
     
     def create_swap(self, secret_hash):
-        """Create atomic swap dengan hash."""
+        """Create atomic swap with hash."""
         if self.state != State.INIT:
             return False, "Already initialized"
         self.swap_hash = secret_hash
         return True, "Swap created"
     
     def claim(self, sender, secret):
-        """Claim dengan reveal secret."""
+        """Claim by revealing secret."""
         if self.state != State.FUNDED:
             return False, "Not funded"
         
-        # Verifikasi hash
+        # Verify hash
         from hashlib import sha256
         computed_hash = sha256(secret.encode()).hexdigest()
         
@@ -192,7 +192,7 @@ class AtomicSwapUsecase(EscrowBase):
 # ==============================================================================
 
 class MarketplaceEscrowUsecase(EscrowBase):
-    """Usecase 5: Marketplace - Integrase dengan sistem rating."""
+    """Usecase 5: Marketplace Escrow - Integrates with rating system."""
     
     def __init__(self, depositor, beneficiary, amount, deadline, order_id=None):
         super().__init__(depositor, beneficiary, amount, deadline)
@@ -203,7 +203,7 @@ class MarketplaceEscrowUsecase(EscrowBase):
         self.usecase_name = "Marketplace Escrow"
     
     def raise_dispute(self, sender, reason):
-        """Raise dispute jika ada masalah."""
+        """Raise dispute if there is an issue."""
         if sender not in [self.depositor, self.beneficiary]:
             return False, "Unauthorized"
         
@@ -215,7 +215,7 @@ class MarketplaceEscrowUsecase(EscrowBase):
         return True, "Dispute raised"
     
     def rate_transaction(self, sender, rating):
-        """Kasih rating setelah transaksi."""
+        """Rate transaction after completion."""
         if self.state != State.RELEASED:
             return False, "Can only rate completed transactions"
         
@@ -234,7 +234,7 @@ class MarketplaceEscrowUsecase(EscrowBase):
 # ==============================================================================
 
 class DAOTreasuryEscrowUsecase(EscrowBase):
-    """Usecase 6: DAO Treasury - Multi-sig + governance."""
+    """Usecase 6: DAO Treasury Escrow - Multi-sig + governance."""
     
     def __init__(self, depositor, beneficiary, amount, deadline, required_signers=None):
         super().__init__(depositor, beneficiary, amount, deadline)
@@ -243,19 +243,19 @@ class DAOTreasuryEscrowUsecase(EscrowBase):
         self.usecase_name = "DAO Treasury Escrow"
     
     def add_signer(self, address):
-        """Add signer untuk multi-sig."""
+        """Add signer for multi-sig."""
         self.signers.add(address)
         return True
     
     def release_with_multisig(self, signers_list, now):
-        """Release dengan multi-signature."""
+        """Release with multi-signature."""
         if self.state != State.FUNDED:
             return False, "Not funded"
         
         if len(signers_list) < self.required_signers:
             return False, f"Need {self.required_signers} signatures"
         
-        # Verifikasi semua signer valid
+        # Verify all signers are valid
         for signer in signers_list:
             if signer not in self.signers:
                 return False, f"Invalid signer: {signer}"
@@ -295,35 +295,35 @@ class ReusabilityTestSuite:
     # =========================================================================
     
     def test_simple_escrow_usecase(self):
-        """Test 1: Escrow Sederhana dapat digunakan."""
-        print("\n[MULTI_USECASE] Test escrow sederhana...")
+        """Test 1: Simple escrow can be used."""
+        print("\n[MULTI_USECASE] Test simple escrow...")
         
         deadline = datetime.now() + timedelta(days=7)
         escrow = SimpleEscrowUsecase("alice", "bob", 1000000, deadline)
         
-        # Scenario: Alice deposit, Bob terima
+        # Scenario: Alice deposits, Bob receives
         escrow.fund("alice", 1000000, datetime.now())
-        self.assert_true(escrow.state == State.FUNDED, "Fund berhasil")
+        self.assert_true(escrow.state == State.FUNDED, "Fund successful")
         
         escrow.release("alice", datetime.now())
-        self.assert_true(escrow.state == State.RELEASED, "Release berhasil")
+        self.assert_true(escrow.state == State.RELEASED, "Release successful")
     
     def test_token_escrow_usecase(self):
-        """Test 2: Token Escrow dengan extended functionality."""
+        """Test 2: Token Escrow with extended functionality."""
         print("[MULTI_USECASE] Test token escrow...")
         
         deadline = datetime.now() + timedelta(days=7)
         escrow = TokenEscrowUsecase("alice", "bob", 1000, deadline, "KT1Token", 0)
         
-        # Token escrow dengan verifikasi ownership
+        # Token escrow with ownership verification
         success, msg = escrow.fund("alice", 1000, datetime.now(), "alice")
         self.assert_true(success, f"Token fund: {msg}")
         
         success = escrow.release("alice", datetime.now())
-        self.assert_true(success, "Token release berhasil")
+        self.assert_true(success, "Token release successful")
     
     def test_milestone_escrow_usecase(self):
-        """Test 3: Multi-Milestone Escrow dapat digunakan."""
+        """Test 3: Multi-Milestone Escrow can be used."""
         print("[MULTI_USECASE] Test milestone escrow...")
         
         deadline = datetime.now() + timedelta(days=30)
@@ -340,7 +340,7 @@ class ReusabilityTestSuite:
         self.assert_true(success, f"Milestone 1: {msg}")
     
     def test_atomic_swap_usecase(self):
-        """Test 4: Atomic Swap dapat digunakan."""
+        """Test 4: Atomic Swap can be used."""
         print("[MULTI_USECASE] Test atomic swap...")
         
         deadline = datetime.now() + timedelta(days=7)
@@ -350,10 +350,10 @@ class ReusabilityTestSuite:
         self.assert_true(success, "Swap created")
         
         escrow.fund("alice", 5000000, datetime.now())
-        self.assert_true(escrow.state == State.FUNDED, "Swap funded")
+        self.assert_true(escrow.state == State.FUNDED, "Swap funded successfully successfully")
     
     def test_marketplace_escrow_usecase(self):
-        """Test 5: Marketplace Escrow dapat digunakan."""
+        """Test 5: Marketplace Escrow can be used."""
         print("[MULTI_USECASE] Test marketplace escrow...")
         
         deadline = datetime.now() + timedelta(days=7)
@@ -362,12 +362,12 @@ class ReusabilityTestSuite:
         escrow.fund("buyer", 100000, datetime.now())
         escrow.release("buyer", datetime.now())
         
-        # Rate setelah transaksi
+        # Rate after transaction
         success, msg = escrow.rate_transaction("buyer", 5)
         self.assert_true(success, f"Rating: {msg}")
     
     def test_dao_treasury_usecase(self):
-        """Test 6: DAO Treasury Escrow dapat digunakan."""
+        """Test 6: DAO Treasury Escrow can be used."""
         print("[MULTI_USECASE] Test DAO treasury...")
         
         deadline = datetime.now() + timedelta(days=30)
@@ -378,38 +378,38 @@ class ReusabilityTestSuite:
         escrow.fund("dao", 10000000, datetime.now())
         
         success, msg = escrow.release_with_multisig(["gov1", "gov2"], datetime.now())
-        self.assert_true(success, f"DAO Release: {msg}")
+        self.assert_true(success, f"DAO release: {msg}")
     
     # =========================================================================
     # 2. EXTENSIBILITY TESTS
     # =========================================================================
     
     def test_can_extend_without_core_modification(self):
-        """Test 7: Dapat extend tanpa modifikasi core."""
+        """Test 7: Can extend without core modification."""
         print("\n[EXTENSIBILITY] Test inheritance chain...")
         
-        # TokenEscrow extends EscrowBase tanpa modify core
+        # TokenEscrow extends EscrowBase without modifying core
         deadline = datetime.now() + timedelta(days=7)
         token_escrow = TokenEscrowUsecase("alice", "bob", 100, deadline, "KT1...")
         
-        # Tetap support base functionality
+        # Still supports base functionality
         self.assert_true(hasattr(token_escrow, 'fund'), "Inherit fund method")
         self.assert_true(hasattr(token_escrow, 'release'), "Inherit release method")
         self.assert_true(hasattr(token_escrow, 'refund'), "Inherit refund method")
     
     def test_can_override_methods(self):
-        """Test 8: Dapat override method untuk behavior custom."""
+        """Test 8: Can override methods for custom behavior."""
         print("[EXTENSIBILITY] Test method override...")
         
         deadline = datetime.now() + timedelta(days=7)
         escrow = TokenEscrowUsecase("alice", "bob", 100, deadline)
         
-        # TokenEscrow override fund dengan tambahan verifikasi token
+        # TokenEscrow overrides fund with additional token verification
         success, msg = escrow.fund("alice", 100, datetime.now())
-        self.assert_true(success, "Override method works")
+        self.assert_true(success, "Method override works")
     
     def test_can_add_new_features(self):
-        """Test 9: Dapat add fitur baru tanpa break existing."""
+        """Test 9: Can add new features without breaking existing."""
         print("[EXTENSIBILITY] Test feature addition...")
         
         deadline = datetime.now() + timedelta(days=7)
@@ -418,7 +418,7 @@ class ReusabilityTestSuite:
         milestones = [(datetime.now() + timedelta(days=5), 100)]
         escrow = MilestoneEscrowUsecase("alice", "bob", 1000, deadline, milestones)
         
-        # Original fund/release tetap bekerja
+        # Original fund/release still work
         escrow.fund("alice", 1000, datetime.now())
         self.assert_true(escrow.state == State.FUNDED, "Base functionality intact")
         
@@ -431,12 +431,12 @@ class ReusabilityTestSuite:
     # =========================================================================
     
     def test_multiple_escrows_independent(self):
-        """Test 10: Multiple escrows dapat bekerja independent."""
+        """Test 10: Multiple escrows can work independently."""
         print("\n[COMPOSABILITY] Test multiple contracts...")
         
         deadline = datetime.now() + timedelta(days=7)
         
-        # 3 escrow berbeda, independent
+        # 3 different escrows, independent
         escrow1 = SimpleEscrowUsecase("alice", "bob", 1000, deadline)
         escrow2 = SimpleEscrowUsecase("charlie", "dave", 2000, deadline)
         escrow3 = SimpleEscrowUsecase("eve", "frank", 3000, deadline)
@@ -447,11 +447,11 @@ class ReusabilityTestSuite:
         
         self.assert_true(
             escrow1.state == State.FUNDED and escrow2.state == State.FUNDED and escrow3.state == State.FUNDED,
-            "Multiple contracts independent"
+            "Multiple contracts work independently"
         )
     
     def test_escrows_can_share_utilities(self):
-        """Test 11: Escrows dapat berbagi utility functions."""
+        """Test 11: Escrows can share utility functions."""
         print("[COMPOSABILITY] Test shared utilities...")
         
         deadline = datetime.now() + timedelta(days=7)
@@ -459,13 +459,13 @@ class ReusabilityTestSuite:
         escrow_simple = SimpleEscrowUsecase("alice", "bob", 1000, deadline)
         escrow_token = TokenEscrowUsecase("charlie", "dave", 500, deadline)
         
-        # Keduanya menggunakan base method yang sama
+        # Both use the same base methods
         escrow_simple.fund("alice", 1000, datetime.now())
         escrow_token.fund("charlie", 500, datetime.now())
         
         self.assert_true(
             escrow_simple.balance == 1000 and escrow_token.balance == 500,
-            "Shared logic works"
+            "Shared utilities work correctly"
         )
     
     # =========================================================================
@@ -473,22 +473,22 @@ class ReusabilityTestSuite:
     # =========================================================================
     
     def test_can_adapt_to_different_systems(self):
-        """Test 12: Dapat adapt ke sistem berbeda."""
+        """Test 12: Can adapt to different systems."""
         print("\n[ADAPTER_PATTERN] Test system adaptation...")
         
         deadline = datetime.now() + timedelta(days=7)
         
-        # Sama-sama escrow, beda konteks
+        # Both escrows, different contexts
         marketplace_escrow = MarketplaceEscrowUsecase("buyer", "seller", 100000, deadline, "ORDER1")
         dao_escrow = DAOTreasuryEscrowUsecase("dao", "recipient", 100000, deadline, 3)
         
-        # Keduanya support fund/release
+        # Both support fund/release
         marketplace_escrow.fund("buyer", 100000, datetime.now())
         dao_escrow.fund("dao", 100000, datetime.now())
         
         self.assert_true(
             marketplace_escrow.state == State.FUNDED and dao_escrow.state == State.FUNDED,
-            "Adapt ke berbagai sistem"
+            "Framework adapts to different systems"
         )
     
     # =========================================================================
@@ -496,10 +496,10 @@ class ReusabilityTestSuite:
     # =========================================================================
     
     def test_can_create_new_variant(self):
-        """Test 13: Dapat membuat variant baru."""
+        """Test 13: Can create new variants."""
         print("\n[VARIANT_CREATION] Test creating new variant...")
         
-        # Create variant baru: Insurance Escrow
+        # Create new variant: Insurance Escrow
         class InsuranceEscrowVariant(EscrowBase):
             def __init__(self, depositor, beneficiary, amount, deadline, insurance_id=None):
                 super().__init__(depositor, beneficiary, amount, deadline)
@@ -510,19 +510,19 @@ class ReusabilityTestSuite:
         insurance_escrow = InsuranceEscrowVariant("insurer", "claimant", 1000000, deadline, "INS123")
         
         insurance_escrow.fund("insurer", 1000000, datetime.now())
-        self.assert_true(insurance_escrow.state == State.FUNDED, "Variant works")
+        self.assert_true(insurance_escrow.state == State.FUNDED, "New variant works")
     
     # =========================================================================
     # 6. INTEROPERABILITY TESTS
     # =========================================================================
     
     def test_different_platforms_compatibility(self):
-        """Test 14: Kompatibel di berbagai platform."""
+        """Test 14: Compatible across different platforms."""
         print("\n[INTEROPERABILITY] Test platform compatibility...")
         
         deadline = datetime.now() + timedelta(days=7)
         
-        # Semantic sama di semua platform
+        # Same semantics across all platforms
         escrow_tezos = SimpleEscrowUsecase("tz1Alice", "tz1Bob", 1000000, deadline)
         escrow_etherlink = SimpleEscrowUsecase("0xAlice", "0xBob", 1000000, deadline)
         
@@ -532,7 +532,7 @@ class ReusabilityTestSuite:
         
         self.assert_true(
             escrow_tezos.state == escrow_etherlink.state == State.FUNDED,
-            "Same semantics, different platforms"
+            "Same semantics across different platforms"
         )
     
     # =========================================================================
@@ -540,7 +540,7 @@ class ReusabilityTestSuite:
     # =========================================================================
     
     def test_integration_with_external_system(self):
-        """Test 15: Integrasi dengan sistem eksternal."""
+        """Test 15: Integration with external systems."""
         print("\n[INTEGRATION] Test external system integration...")
         
         deadline = datetime.now() + timedelta(days=7)
@@ -548,21 +548,21 @@ class ReusabilityTestSuite:
         # Marketplace integration
         escrow = MarketplaceEscrowUsecase("buyer", "seller", 100000, deadline, "ORDER001")
         
-        # Fund (like payment gateway)
+        # Fund (e.g., payment gateway)
         escrow.fund("buyer", 100000, datetime.now())
         
-        # Raise dispute (like customer service)
+        # Raise dispute (e.g., customer service)
         success, msg = escrow.raise_dispute("buyer", "Product not received")
-        self.assert_true(success and escrow.dispute_raised, "Integration works")
+        self.assert_true(success and escrow.dispute_raised, "External system integration works")
     
     def test_event_emission_compatible(self):
-        """Test 16: Kompatibel untuk event-based systems."""
+        """Test 16: Compatible with event-based systems."""
         print("[INTEGRATION] Test event compatibility...")
         
         deadline = datetime.now() + timedelta(days=7)
         escrow = SimpleEscrowUsecase("alice", "bob", 1000000, deadline)
         
-        # Simulasi event firing
+        # Simulate event firing
         events = []
         
         if escrow.fund("alice", 1000000, datetime.now()):
@@ -573,7 +573,7 @@ class ReusabilityTestSuite:
         
         self.assert_true(
             len(events) == 2 and "EscrowFunded" in events,
-            "Event emission compatible"
+            "Event emission is compatible"
         )
     
     # =========================================================================
@@ -581,7 +581,7 @@ class ReusabilityTestSuite:
     # =========================================================================
     
     def print_summary(self):
-        """Print hasil reusability test."""
+        """Print reusability test results."""
         total = self.tests_passed + self.tests_failed
         pass_rate = (self.tests_passed / total * 100) if total > 0 else 0
         
@@ -598,7 +598,7 @@ class ReusabilityTestSuite:
 
 
 def main():
-    """Jalankan semua reusability tests."""
+    """Run all reusability tests."""
     print("\n")
     print("╔" + "═" * 68 + "╗")
     print("║" + " " * 8 + "FortiEscrow Framework Reusability Test (PENTING)" + " " * 12 + "║")
@@ -607,7 +607,7 @@ def main():
     suite = ReusabilityTestSuite()
     
     print("\n" + "=" * 70)
-    print("1. MULTI-USECASE VALIDATION (Dapat digunakan berbagai kasus)")
+    print("1. MULTI-USECASE VALIDATION (Can be used for various cases)")
     print("=" * 70)
     suite.test_simple_escrow_usecase()
     suite.test_token_escrow_usecase()
@@ -617,25 +617,25 @@ def main():
     suite.test_dao_treasury_usecase()
     
     print("\n" + "=" * 70)
-    print("2. EXTENSIBILITY VALIDATION (Dapat diperluas tanpa break core)")
+    print("2. EXTENSIBILITY VALIDATION (Can extend without breaking core)")
     print("=" * 70)
     suite.test_can_extend_without_core_modification()
     suite.test_can_override_methods()
     suite.test_can_add_new_features()
     
     print("\n" + "=" * 70)
-    print("3. COMPOSABILITY VALIDATION (Komponen dapat dikomposisi)")
+    print("3. COMPOSABILITY VALIDATION (Components can be composed)")
     print("=" * 70)
     suite.test_multiple_escrows_independent()
     suite.test_escrows_can_share_utilities()
     
     print("\n" + "=" * 70)
-    print("4. ADAPTER_PATTERN VALIDATION (Beradaptasi dengan sistem lain)")
+    print("4. ADAPTER_PATTERN VALIDATION (Adapt to different systems)")
     print("=" * 70)
     suite.test_can_adapt_to_different_systems()
     
     print("\n" + "=" * 70)
-    print("5. VARIANT_CREATION VALIDATION (Membuat variant baru)")
+    print("5. VARIANT_CREATION VALIDATION (Create new variants)")
     print("=" * 70)
     suite.test_can_create_new_variant()
     
@@ -645,7 +645,7 @@ def main():
     suite.test_different_platforms_compatibility()
     
     print("\n" + "=" * 70)
-    print("7. INTEGRATION VALIDATION (Integrasi sistem eksternal)")
+    print("7. INTEGRATION VALIDATION (External system integration)")
     print("=" * 70)
     suite.test_integration_with_external_system()
     suite.test_event_emission_compatible()
@@ -654,18 +654,18 @@ def main():
     success = suite.print_summary()
     
     print("\n" + "=" * 70)
-    print("HASIL REUSABILITY ASSESSMENT")
+    print("REUSABILITY ASSESSMENT RESULTS")
     print("=" * 70)
     
     if success:
         print("""
-✅ FRAMEWORK REUSABILITY TERBUKTI!
+✅ FRAMEWORK REUSABILITY PROVEN!
 
-Dimensi Reusability Yang Terverifikasi:
+Reusability Dimensions Verified:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. MULTI-USECASE ✅
-   Framework dapat digunakan untuk 6+ use case berbeda:
+   Framework can be used for 6+ different use cases:
    • Simple XTZ Escrow
    • Token Escrow (FA2/FA1.2)
    • Multi-Milestone Escrow
@@ -674,62 +674,62 @@ Dimensi Reusability Yang Terverifikasi:
    • DAO Treasury Escrow
 
 2. EXTENSIBILITY ✅
-   Dapat diperluas tanpa modifikasi core:
-   • Inheritance chain bekerja
+   Can be extended without modifying core:
+   • Inheritance chain works
    • Method override support
-   • Feature addition tanpa breaking changes
+   • Feature addition without breaking changes
 
 3. COMPOSABILITY ✅
-   Komponen dapat dikombinasikan:
-   • Multiple contracts berjalan independent
-   • Shared utilities antar contracts
+   Components can be combined:
+   • Multiple contracts run independently
+   • Shared utilities across contracts
    • Modular design
 
 4. ADAPTER_PATTERN ✅
-   Beradaptasi dengan berbagai sistem:
+   Adapts to different systems:
    • Marketplace integration
    • DAO governance integration
    • Custom domain logic
 
 5. VARIANT_CREATION ✅
-   Mudah membuat variant baru:
-   • Inheritance dari base
-   • Override hanya logic yang berbeda
-   • New variant dalam beberapa baris kode
+   Easy to create new variants:
+   • Inheritance from base
+   • Override only differing logic
+   • New variants in a few lines of code
 
 6. INTEROPERABILITY ✅
-   Kompatibel lintas platform:
+   Cross-platform compatible:
    • Tezos & Etherlink
-   • Sama semantik di semua platform
+   • Same semantics across all platforms
    • Platform-agnostic design
 
 7. INTEGRATION ✅
-   Terintegrasi dengan sistem eksternal:
+   Integrates with external systems:
    • Event-based compatibility
    • External system integration
    • Modular entry points
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-KESIMPULAN:
-FortiEscrow adalah framework yang TRULY REUSABLE yang dapat berfungsi
-sebagai "primitive kepercayaan yang dapat digunakan kembali" untuk
-ekosistem blockchain Tezos dan Etherlink.
+CONCLUSION:
+FortiEscrow is a TRULY REUSABLE framework that can serve as a
+"reusable trust primitive" for the Tezos and Etherlink blockchain
+ecosystems.
 
-Framework ini terbukti dapat:
-✅ Digunakan untuk berbagai kasus, bukan hanya satu use case
-✅ Diperluas untuk kebutuhan spesifik tanpa modifikasi core
-✅ Dikomposisi dengan kontrak lain
-✅ Beradaptasi dengan sistem dan domain berbeda
-✅ Dikembangkan menjadi variant baru dengan mudah
-✅ Berjalan di platform blockchain berbeda dengan semantik sama
-✅ Terintegrasi dengan sistem eksternal
+The framework is proven to:
+✅ Work for various cases, not just a single use case
+✅ Extend for specific needs without modifying core
+✅ Compose with other contracts
+✅ Adapt to different systems and domains
+✅ Develop new variants easily
+✅ Run on different blockchains with same semantics
+✅ Integrate with external systems
 
 STATUS: READY FOR PRODUCTION & ECOSYSTEM ADOPTION
 """)
         return 0
     else:
-        print("\n❌ Beberapa test gagal. Review untuk production readiness.")
+        print("\n❌ Some tests failed. Review before production readiness.")
         return 1
 
 
