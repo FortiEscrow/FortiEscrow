@@ -23,3 +23,12 @@ ENV/
 *.swo
 *~
 .DS_Store
+
+# Test and Verification Files (Local Use Only)
+semantic_tests.py
+adversarial_tests.py
+audit_verification.py
+reusability_tests.py
+test_framework.py
+verify_contracts.py
+test_forti_escrow.py
