@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="assets/FortiEscrow_logo.png" alt="FortiEscrow Logo" width="300">
+</div>
+
 # FortiEscrow
 
 A reusable escrow smart contract framework for Tezos and Etherlink. FortiEscrow standardizes escrow semantics as a composable trust primitive for decentralized applications.
