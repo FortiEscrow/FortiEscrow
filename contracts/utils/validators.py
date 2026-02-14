@@ -229,26 +229,28 @@ class Validators:
         msg = error_msg if error_msg else "UNAUTHORIZED"
         sp.verify(sp.sender == expected, msg)
 
-    @staticmethod
-    def require_sender_in(allowed_list, error_msg=None):
-        """
-        Verify sender is in allowed list.
-
-        Args:
-            allowed_list: List of allowed addresses
-            error_msg: Custom error message (optional)
-
-        Raises:
-            error_msg or default UNAUTHORIZED
-        """
-        msg = error_msg if error_msg else "UNAUTHORIZED"
-
-        is_allowed = sp.local("is_allowed", False)
-        sp.for addr in allowed_list:
-            with sp.if_(sp.sender == addr):
-                is_allowed.value = True
-
-        sp.verify(is_allowed.value, msg)
+    # @staticmethod
+    # def require_sender_in(allowed_list, error_msg=None):
+    #     """
+    #     Verify sender is in allowed list.
+    #     
+    #     NOTE: This function uses SmartPy-specific syntax (sp.for, sp.if_, sp.local)
+    #     and should only be used within a SmartPy contract context, not in utilities.
+    #     Left here for reference but commented out due to Python syntax incompatibility.
+    #
+    #     Args:
+    #         allowed_list: List of allowed addresses
+    #         error_msg: Custom error message (optional)
+    #
+    #     Raises:
+    #         error_msg or default UNAUTHORIZED
+    #     """
+    #     msg = error_msg if error_msg else "UNAUTHORIZED"
+    #     is_allowed = sp.local("is_allowed", False)
+    #     sp.for addr in allowed_list:
+    #         with sp.if_(sp.sender == addr):
+    #             is_allowed.value = True
+    #     sp.verify(is_allowed.value, msg)
 
     # ==========================================================================
     # STATE VALIDATORS

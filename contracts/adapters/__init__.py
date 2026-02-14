@@ -19,13 +19,9 @@ Security Guarantee:
 from contracts.adapters.escrow_adapter import (
     EscrowAdapter,
     CreateEscrowRequest,
-    FullEscrowStatus,
-    EscrowSummary,
 )
 
 __all__ = [
     "EscrowAdapter",
     "CreateEscrowRequest",
-    "FullEscrowStatus",
-    "EscrowSummary",
 ]

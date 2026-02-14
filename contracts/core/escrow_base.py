@@ -87,31 +87,32 @@ class EscrowError:
 
 
 # ==============================================================================
-# TYPE DEFINITIONS
+# TYPE DEFINITIONS (Legacy - kept for documentation purposes)
 # ==============================================================================
+# Note: Type annotations are provided in docstrings since sp.TRecord
+# is not available in this SmartPy version. These serve as documentation
+# for contract consumers.
 
 # Escrow configuration passed to factory
-EscrowConfig = sp.TRecord(
-    depositor=sp.TAddress,
-    beneficiary=sp.TAddress,
-    amount=sp.TNat,
-    timeout_seconds=sp.TNat
-)
+#   depositor: sp.TAddress
+#   beneficiary: sp.TAddress
+#   amount: sp.TNat
+#   timeout_seconds: sp.TNat
+EscrowConfig = dict  # Type hint for documentation
 
 # Escrow status for views
-EscrowStatus = sp.TRecord(
-    state=sp.TInt,
-    state_name=sp.TString,
-    depositor=sp.TAddress,
-    beneficiary=sp.TAddress,
-    amount=sp.TNat,
-    deadline=sp.TTimestamp,
-    is_funded=sp.TBool,
-    is_terminal=sp.TBool,
-    can_release=sp.TBool,
-    can_refund=sp.TBool,
-    can_force_refund=sp.TBool
-)
+#   state: sp.TInt
+#   state_name: sp.TString
+#   depositor: sp.TAddress
+#   beneficiary: sp.TAddress
+#   amount: sp.TNat
+#   deadline: sp.TTimestamp
+#   is_funded: sp.TBool
+#   is_terminal: sp.TBool
+#   can_release: sp.TBool
+#   can_refund: sp.TBool
+#   can_force_refund: sp.TBool
+EscrowStatus = dict  # Type hint for documentation
 
 
 # ==============================================================================
@@ -225,32 +226,123 @@ class EscrowBase(sp.Contract):
         sp.verify(sp.sender == expected, error_msg)
 
     def _is_timeout_expired(self):
-        """Check if timeout has passed"""
-        return sp.now > self.data.deadline
+        """
+        Check if timeout has expired (deadline reached or passed).
+        
+        SEMANTIC: Returns True when deadline is AT or AFTER now.
+        This allows recovery as soon as deadline is reached, not after.
+        
+        Security: Prevents release() at exact deadline, allowing only force_refund().
+        """
+        return sp.now >= self.data.deadline
 
     def _calculate_deadline(self):
         """Calculate deadline from current time + timeout"""
         return sp.add_seconds(sp.now, sp.to_int(self.data.timeout_seconds))
 
+    def _settle(self, recipient):
+        """
+        ========================================================================
+        CENTRALIZED SETTLEMENT FUNCTION - ONLY fund transfer mechanism
+        ========================================================================
+        
+        Transfer ALL contract funds to recipient (beneficiary or depositor).
+        
+        This is the SINGLE POINT OF CONTROL for all fund transfers in this
+        escrow contract. All settlement paths (release, refund, force_refund)
+        must route through this function to ensure consistent security.
+        
+        PARAMETERS:
+        -----------
+        recipient: sp.TAddress
+            The address receiving the funds (beneficiary or original depositor)
+        
+        SECURITY DESIGN:
+        ----------------
+        1. USES sp.balance (not escrow_amount):
+           - Transfers ALL funds in contract
+           - Prevents dust/extra XTZ lockup (e.g., if someone sends extra XTZ)
+           - Handles edge case: sp.balance != escrow_amount
+           
+           Example:
+             escrow_amount = 100 mutez
+             sp.balance = 105 mutez (5 extra somehow in contract)
+             Old: sends only 100 → 5 mutez forever locked ✗
+             New: sends 105 → no funds locked ✓
+        
+        2. ASSUMES caller has already changed state to TERMINAL:
+           - This enforces CEI pattern (Checks-Effects-Interactions)
+           - Caller verifies preconditions (state, auth, deadline)
+           - Caller changes state to terminal (RELEASED or REFUNDED)
+           - This function does ONLY the Interaction (sp.send)
+           
+        3. NO ADDITIONAL STATE CHANGES HERE:
+           - State transition handled by caller
+           - This function is pure transfer
+           - Allows flexibility in pre-transfer effects
+        
+        THREAT MODEL:
+        --------------
+        Prevents:
+        - Double settlement (precondition checks by caller prevent this)
+        - Partial settlement (transfers all balance, not fixed amount)
+        - Fund lockup (uses sp.balance, not escrow_amount)
+        - Transfer-after-effect bugs (caller changes state first)
+        
+        Does NOT prevent:
+        - Invalid recipient address (mitigated by init-time validation)
+        - Low gas for transfer (mitigated by recipient validation)
+        
+        CEI PATTERN ENFORCEMENT:
+        ----------------------
+        Caller MUST follow:
+        
+            # 1. CHECKS: Verify preconditions
+            sp.verify(self.data.state == STATE_FUNDED, "INVALID_STATE")
+            sp.verify(...other guards...)
+            
+            # 2. EFFECTS: Change state to terminal
+            self.data.state = STATE_RELEASED  # or STATE_REFUNDED
+            
+            # 3. INTERACTIONS: Call settlement function
+            self._settle(recipient)
+            
+            # 4. DONE: Return (no logic after this)
+        
+        This order is CRITICAL:
+        - If transfer fails after state change: contract enters terminal state
+          with funds stuck (acceptable; prevents infinite loop)
+        - If we changed order, transfer failure could allow double settlement
+        """
+        sp.send(recipient, sp.balance)
+
     def _transfer_to_beneficiary(self):
         """
         Transfer ALL contract funds to beneficiary.
 
-        SECURITY FIX: Uses sp.balance instead of escrow_amount to ensure
-        all funds are transferred, preventing any locked funds from
-        direct transfers or dust.
+        BACKWARDS COMPATIBLE WRAPPER for _settle() function.
+        
+        Historical note: This function previously isolated beneficiary
+        transfer logic. Now it delegates to centralized _settle() to
+        ensure all transfers follow uniform settlement strategy.
+        
+        See _settle() for full security documentation.
         """
-        sp.send(self.data.beneficiary, sp.balance)
+        self._settle(self.data.beneficiary)
 
     def _transfer_to_depositor(self):
         """
         Transfer ALL contract funds back to depositor.
 
-        SECURITY FIX: Uses sp.balance instead of escrow_amount to ensure
-        all funds are transferred, preventing any locked funds from
-        direct transfers or dust.
+        BACKWARDS COMPATIBLE WRAPPER for _settle() function.
+        
+        Historical note: This function previously isolated depositor
+        transfer logic. Now it delegates to centralized _settle() to
+        ensure all transfers follow uniform settlement strategy.
+        
+        See _settle() for full security documentation.
         """
-        sp.send(self.data.depositor, sp.balance)
+        self._settle(self.data.depositor)
 
     # ==========================================================================
     # ENTRY POINT: fund()
@@ -325,9 +417,12 @@ class EscrowBase(sp.Contract):
         # [AUTH CHECK] Only depositor can release
         self._require_sender(self.data.depositor, EscrowError.NOT_DEPOSITOR)
 
-        # [TIMEOUT CHECK] Cannot release after deadline
+        # [TIMEOUT CHECK] Cannot release at or after deadline
+        # SECURITY: Strictly before deadline (sp.now < deadline, not <=)
+        # This ensures clear boundary: release expires exactly at deadline,
+        # force_refund becomes available at exact deadline (no overlap).
         sp.verify(
-            sp.now <= self.data.deadline,
+            sp.now < self.data.deadline,
             EscrowError.DEADLINE_PASSED
         )
 
@@ -380,38 +475,103 @@ class EscrowBase(sp.Contract):
     @sp.entry_point
     def force_refund(self):
         """
-        FUNDED → REFUNDED: Emergency recovery after timeout.
+        Emergency Timeout Recovery: FUNDED → REFUNDED (terminal state).
 
-        Authorization: ANYONE can call (permissionless recovery)
+        CRITICAL GUARANTEES:
+        ======================
+        1. PERMISSIONLESS RECOVERY: Anyone can call (no authorization required)
+        2. DEADLINE DETERMINISTIC: Available AT deadline (sp.now >= deadline)
+        3. IMMUTABLE REFUND DEST: Funds always returned to original depositor
+        4. ATOMIC EXECUTION: State change BEFORE fund transfer (CEI pattern)
+        5. SINGLE REFUND ONLY: Terminal state prevents duplicate calls
+        6. ANTI-FUND-LOCK: Funds ALWAYS recoverable after deadline
 
-        Security Checks:
-            1. State must be FUNDED
-            2. Deadline must have passed
+        PRECONDITIONS (All must be met):
+        ================================
+        • state == STATE_FUNDED (not INIT, not terminal)
+        • sp.now >= deadline (at or after deadline, not before)
+        • No authorization check (intentionally permissionless)
 
-        Effects:
-            - State changes to REFUNDED (terminal)
-            - Funds returned to depositor (always)
+        DEADLINE SEMANTICS (Border Between Windows):
+        ============================================
+        Timeline:             [fund_at] ←── timeout_seconds ──→ [deadline]
+        release() window:     [fund_at, deadline)    ← strictly before deadline
+        force_refund() window:                [deadline, ∞)  ← from deadline onward
+        Boundary behavior:    At sp.now == deadline:
+                              • release(): NOW < deadline? NO → FAILS ✗
+                              • force_refund(): NOW >= deadline? YES → SUCCEEDS ✓
+        Result:              No overlap, no gap. Clear transition.
 
-        Anti-Fund-Locking Guarantee:
-            This ensures funds are NEVER permanently locked.
-            After timeout expires, any party can trigger recovery.
-            Funds always go to depositor (immutable destination).
+        POSTCONDITION:
+        ==============
+        • state becomes STATE_REFUNDED (terminal, immutable)
+        • funds transferred to depositor via sp.send()
+        • all future operations on this escrow blocked
+
+        WHY PERMISSIONLESS:
+        ===================
+        Permissionless recovery is a FEATURE, not a bug:
+        • Depositor might be unavailable, unresponsive, or lost keys
+        • Beneficiary should not be able to keep funds indefinitely
+        • Any third party (arbitrator, observer) can ensure fair outcome
+        • Destination (depositor) is immutable; cannot be redirected
+        • Caller gains nothing from calling this (funds don't go to them)
+
+        RACE CONDITION SAFETY:
+        ======================
+        Tezos block processing is sequential (not parallel within block).
+        At exactly deadline timestamp:
+        • Multiple release() calls will all FAIL (sp.now < deadline is false)
+        • Multiple force_refund() calls will proceed; first wins (state change)
+        • Subsequent force_refund() calls will FAIL (state != FUNDED)
+        Result: Serialized, deterministic execution.
+
+        CEI PATTERN (Checks-Effects-Interactions):
+        ===========================================
+        Order 1: Check all preconditions (state, timeout)
+            └─ If any check fails: ABORT immediately, no state change
+        Order 2: Change state (effect): state := REFUNDED
+            └─ State commitment before external interaction
+        Order 3: Transfer funds (interaction): sp.send()
+            └─ External call occurs only AFTER state change
+        Pattern safety: Prevents reentrancy (no state revert after transfer)
         """
 
-        # [STATE CHECK] Must be funded
-        self._require_funded()
-
-        # [TIMEOUT CHECK] Must be after deadline
+        # =====================================================================
+        # [GUARD 1: STATE CHECK] Must be in FUNDED state, not INIT or terminal
+        # =====================================================================
         sp.verify(
-            self._is_timeout_expired(),
+            self.data.state == STATE_FUNDED,
+            EscrowError.NOT_FUNDED
+        )
+
+        # =====================================================================
+        # [GUARD 2: TIMEOUT CHECK] Deadline must be reached or passed
+        # =====================================================================
+        # Critical: Uses >= (at-or-after), not > (strictly-after)
+        # This means recovery is available AT the deadline moment, not after.
+        # Semantics: release() expires at deadline; recovery starts at deadline.
+        sp.verify(
+            sp.now >= self.data.deadline,
             EscrowError.TIMEOUT_NOT_EXPIRED
         )
 
-        # [STATE TRANSITION] FUNDED → REFUNDED (before transfer!)
+        # =====================================================================
+        # [EFFECT: STATE TRANSITION] Atomic state change BEFORE transfer
+        # =====================================================================
+        # This is the critical CEI pattern: effects (state) before interactions (transfer)
+        # Once state changes, subsequent force_refund() calls will fail on Guard 1
+        # No reentrancy window because state is already terminal
         self.data.state = STATE_REFUNDED
 
-        # [TRANSFER] Return funds to depositor
-        self._transfer_to_depositor()
+        # =====================================================================
+        # [INTERACTION: FUND TRANSFER] Return funds to depositor
+        # =====================================================================
+        # Safe to execute here because state already committed to terminal
+        # If transfer fails for any reason, state is already REFUNDED (no rollback)
+        # Funds always go to depositor (immutable destination at init time)
+        # Routes through centralized _settle() for uniform settlement strategy
+        self._settle(self.data.depositor)
 
     # ==========================================================================
     # DEFAULT ENTRY POINT: Reject Direct Transfers

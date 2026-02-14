@@ -179,30 +179,7 @@ __all__ = [
 
 
 # ==============================================================================
-# LEGACY COMPATIBILITY
-# ==============================================================================
-
-# For backwards compatibility with old imports
-class FortiEscrowError:
-    """
-    Legacy error codes (deprecated, use EscrowError instead)
-    """
-    INVALID_STATE = EscrowError.INVALID_STATE
-    INSUFFICIENT_FUNDS = EscrowError.AMOUNT_MISMATCH
-    UNAUTHORIZED = EscrowError.UNAUTHORIZED
-    INVALID_PARAMETERS = EscrowError.INVALID_PARAMS
-    TIMEOUT_NOT_REACHED = EscrowError.TIMEOUT_NOT_EXPIRED
-    TIMEOUT_EXCEEDED = EscrowError.DEADLINE_PASSED
-    ZERO_AMOUNT = EscrowError.ZERO_AMOUNT
-    DUPLICATE_PARTY = EscrowError.SAME_PARTY
-
-
-# Legacy alias
-FortiEscrow = SimpleEscrow
-
-
-# ==============================================================================
-# EXAMPLE DEPLOYMENTS
+# COMPILATION TARGETS
 # ==============================================================================
 
 if __name__ == "__main__":

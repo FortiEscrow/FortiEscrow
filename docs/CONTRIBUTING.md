@@ -43,10 +43,23 @@ pytest tests/ -v
 pytest tests/ -v
 ```
 
+### Run Specific Test Category
+
+```bash
+# Unit tests
+pytest tests/unit/ -v
+
+# Adversarial tests
+pytest tests/adversarial/ -v
+
+# Invariant verification tests
+pytest tests/invariant/ -v
+```
+
 ### Run Specific Test File
 
 ```bash
-pytest tests/test_invariants.py -v
+pytest tests/invariant/test_invariants.py -v
 ```
 
 ### Test Coverage
@@ -82,18 +95,18 @@ When modifying contract code:
 
 ### Security Invariant Checklist
 
-- [ ] Funds Safety: transfers only in terminal states
+- [ ] Funds Safety: transfers only in terminal states via `_settle()`
 - [ ] State Consistency: valid FSM transitions only
 - [ ] Authorization: correct sender checks
-- [ ] Time Safety: deadline handling correct
+- [ ] Time Safety: deadline handling correct (`now >= deadline` for recovery)
 - [ ] No Fund-Locking: exit paths preserved
 
-## Adding New Variants
+## Adding New Contract Variants
 
-### Create Variant
+### Create Contract
 
 ```python
-# contracts/variants/my_variant/my_escrow.py
+# contracts/core/my_escrow.py
 from contracts.core.escrow_base import EscrowBase
 
 class MyEscrow(EscrowBase):
@@ -107,15 +120,15 @@ class MyEscrow(EscrowBase):
 ### Add Tests
 
 ```python
-# tests/test_my_variant.py
-def test_my_variant_happy_path():
+# tests/unit/test_my_escrow.py
+def test_my_escrow_happy_path():
     # Test implementation
     pass
 ```
 
-### Document Variant
+### Document Contract
 
-Update [README.md](README.md) contract variants table.
+Update [README.md](../README.md) contract variants section and [docs/API.md](API.md) with the new contract API.
 
 ## Reporting Issues
 

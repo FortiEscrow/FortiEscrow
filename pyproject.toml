@@ -1,27 +1,26 @@
-[metadata]
-name = forti-escrow
-version = 1.0.0
-author = FortiEscrow Team
-description = Security-first escrow framework on Tezos
-long_description = file: README.md
-long_description_content_type = text/markdown
-url = https://github.com/yourusername/FortiEscrow-Labs
-project_urls =
-    Bug Tracker = https://github.com/yourusername/FortiEscrow-Labs/issues
-    Documentation = https://github.com/yourusername/FortiEscrow-Labs/docs
-classifiers =
-    Development Status :: 5 - Production/Stable
-    Intended Audience :: Developers
-    Topic :: Software Development :: Libraries :: Python Modules
-    License :: OSI Approved :: MIT License
-    Programming Language :: Python :: 3
-    Programming Language :: Python :: 3.7
-    Programming Language :: Python :: 3.8
-    Programming Language :: Python :: 3.9
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
 
-[options]
-packages = find:
-python_requires = >=3.7
-install_requires =
-    smartpy>=0.14.0
-    pytest>=6.0.0
+[project]
+name = "forti-escrow"
+version = "1.0.0"
+description = "Security-first escrow framework on Tezos"
+readme = "README.md"
+requires-python = ">=3.7"
+authors = [{name = "FortiEscrow Team"}]
+dependencies = [
+    "smartpy>=0.14.0",
+    "pytest>=6.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/FortiEscrow-Labs"
+"Bug Tracker" = "https://github.com/yourusername/FortiEscrow-Labs/issues"
+Documentation = "https://github.com/yourusername/FortiEscrow-Labs/docs"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

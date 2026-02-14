@@ -207,12 +207,11 @@ def test_fund_lock_recovery_path_3():
     scenario.verify(escrow.data.deadline > sp.now)
     
     # Step 2: Simulate time passing (deadline reached)
-    scenario += sp.test_scenario().now_dt += sp.to_int(MIN_TIMEOUT_SECONDS) + 1
-    
-    # Step 3: OBSERVER (anyone) calls force_refund() after timeout
-    escrow.force_refund(
-        _from=OBSERVER,  # Different party, not depositor or beneficiary
-        _valid=True
+    scenario.h2("Advance time past deadline")
+    scenario += escrow.force_refund().run(
+        sender=OBSERVER,
+        now=scenario.now_in_seconds + MIN_TIMEOUT_SECONDS + 1,
+        valid=True
     )
     
     # Verify: Terminal state reached
@@ -269,7 +268,14 @@ def test_fund_lock_both_parties_disappear():
     
     # Simulate: Both parties disappear (they never call any entrypoint)
     # Time passes...
-    scenario += sp.test_scenario().now_dt += sp.to_int(MIN_TIMEOUT_SECONDS) + 1
+    scenario += escrow.force_refund().run(
+        sender=OBSERVER,
+        now=scenario.now_in_seconds + MIN_TIMEOUT_SECONDS + 1,
+        valid=True
+    )
+    
+    # Verify refund succeeded after timeout
+    scenario.verify(escrow.data.state == STATE_REFUNDED)
     
     # After timeout, ANY third party can recover
     escrow.force_refund(
@@ -563,8 +569,11 @@ def test_fund_lock_terminal_guarantee():
     )
     scenario3 += escrow3
     escrow3.fund(_from=DEPOSITOR, _amount=sp.utils.nat_to_mutez(AMOUNT), _sent=sp.utils.nat_to_mutez(AMOUNT), _valid=True)
-    scenario3 += sp.test_scenario().now_dt += sp.to_int(MIN_TIMEOUT_SECONDS) + 1
-    escrow3.force_refund(_from=OBSERVER, _valid=True)
+    scenario3 += escrow3.force_refund().run(
+        sender=OBSERVER,
+        now=scenario3.now_in_seconds + MIN_TIMEOUT_SECONDS + 1,
+        valid=True
+    )
     scenario3.verify(escrow3.data.state == STATE_REFUNDED)
     scenario3.h2("Path 3: force_refund() → REFUNDED (terminal)")
     

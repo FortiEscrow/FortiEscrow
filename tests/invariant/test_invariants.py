@@ -7,7 +7,7 @@ Philosophy: "Reject any behavior that cannot be verified as safe."
 """
 
 import smartpy as sp
-from contracts.invariants import (
+from contracts.core.invariants import (
     FundsSafetyInvariant,
     StateConsistencyInvariant,
     AuthorizationInvariant,

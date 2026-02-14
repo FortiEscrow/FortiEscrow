@@ -6,14 +6,18 @@ A security-first, reusable escrow framework for the Tezos blockchain.
 
 Architecture:
     contracts/
-    ├── core/           # Main escrow contracts
-    │   ├── escrow_base.py      # Base class & SimpleEscrow
-    │   ├── escrow_multisig.py  # 2-of-3 MultiSig variant
-    │   └── escrow_factory.py   # Factory for deployment
+    ├── core/           # Main escrow contracts & invariants
+    │   ├── escrow_base.py              # Base class & SimpleEscrow
+    │   ├── escrow_multisig.py          # 2-of-3 MultiSig variant
+    │   ├── escrow_factory.py           # Factory for deployment
+    │   ├── invariants.py               # Formal invariant definitions
+    │   └── invariants_enforcement.py   # Runtime invariant checking
     ├── interfaces/     # Types, errors, events
     │   ├── types.py
     │   ├── errors.py
     │   └── events.py
+    ├── adapters/       # Integration adapters
+    │   └── escrow_adapter.py
     └── utils/          # Validation & helpers
         ├── validators.py
         ├── amount_validator.py

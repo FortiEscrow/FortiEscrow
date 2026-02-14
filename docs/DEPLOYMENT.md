@@ -12,7 +12,7 @@ pip install smartpy
 
 ## Compilation
 
-### Compile Contract
+### Compile SimpleEscrow
 
 ```bash
 # Compile SimpleEscrow
@@ -23,7 +23,20 @@ smartpy compile contracts/core/escrow_base.py build/
 # build/SimpleEscrow/step_000_cont_0_storage.tz    (Initial storage)
 ```
 
+### Compile MultiSigEscrow
+
+```bash
+# Compile MultiSigEscrow
+smartpy compile contracts/core/escrow_multisig.py build/
+
+# Output files
+# build/MultiSigEscrow/step_000_cont_0_contract.tz   (Michelson)
+# build/MultiSigEscrow/step_000_cont_0_storage.tz    (Initial storage)
+```
+
 ### Compile with Custom Parameters
+
+#### SimpleEscrow
 
 ```python
 import smartpy as sp
@@ -39,15 +52,38 @@ def compile():
     )
 ```
 
+#### MultiSigEscrow
+
+```python
+import smartpy as sp
+from contracts.core.escrow_multisig import MultiSigEscrow
+
+@sp.add_compilation_target("MyMultiSigEscrow")
+def compile():
+    return MultiSigEscrow(
+        depositor=sp.address("tz1..."),
+        beneficiary=sp.address("tz1..."),
+        arbiter=sp.address("tz1..."),
+        amount=sp.nat(50_000_000),       # 50 XTZ
+        timeout_seconds=sp.nat(1209600)  # 14 days
+    )
+```
+
 ## Deployment
 
 ### Using SmartPy CLI
 
 ```bash
-# Deploy to Ghostnet (testnet)
+# Deploy SimpleEscrow to Ghostnet (testnet)
 smartpy originate-contract \
   --code build/SimpleEscrow/step_000_cont_0_contract.tz \
   --storage build/SimpleEscrow/step_000_cont_0_storage.tz \
+  --rpc https://ghostnet.tezos.marigold.dev
+
+# Deploy MultiSigEscrow to Ghostnet (testnet)
+smartpy originate-contract \
+  --code build/MultiSigEscrow/step_000_cont_0_contract.tz \
+  --storage build/MultiSigEscrow/step_000_cont_0_storage.tz \
   --rpc https://ghostnet.tezos.marigold.dev
 ```
 
@@ -72,12 +108,12 @@ console.log(`Contract deployed at: ${contract.contractAddress}`);
 
 ### Timeout Selection
 
-| Use Case | Recommended Timeout |
-|----------|---------------------|
-| Digital goods | 24-72 hours |
-| Freelance services | 7-14 days |
-| Large transactions | 30 days |
-| Atomic swaps | 1-4 hours |
+| Use Case | Recommended Timeout | Recommended Variant |
+|----------|---------------------|---------------------|
+| Digital goods | 24-72 hours | SimpleEscrow |
+| Freelance services | 7-14 days | MultiSigEscrow |
+| Large transactions | 30 days | MultiSigEscrow |
+| Atomic swaps | 1-4 hours | SimpleEscrow |
 
 ### Amount Precision
 
@@ -96,15 +132,25 @@ amount=sp.nat(100_000_000)
 
 ## Pre-Deployment Checklist
 
-### Address Verification
+### SimpleEscrow
 
 - [ ] Depositor address is correct (no typos)
 - [ ] Beneficiary address is correct (no typos)
 - [ ] Depositor != Beneficiary
 - [ ] Both addresses exist on target network
+- [ ] Amount > 0
+- [ ] Timeout >= 3600 seconds (1 hour minimum)
+- [ ] Timeout <= 31536000 seconds (1 year maximum)
+- [ ] Timeout is appropriate for use case
 
-### Parameter Verification
+### MultiSigEscrow
 
+- [ ] Depositor address is correct (no typos)
+- [ ] Beneficiary address is correct (no typos)
+- [ ] Arbiter address is correct (no typos)
+- [ ] All three addresses are different
+- [ ] All addresses exist on target network
+- [ ] Arbiter is trusted and responsive
 - [ ] Amount > 0
 - [ ] Timeout >= 3600 seconds (1 hour minimum)
 - [ ] Timeout <= 31536000 seconds (1 year maximum)
@@ -125,7 +171,7 @@ amount=sp.nat(100_000_000)
 tezos-client get contract storage for KT1...
 ```
 
-Expected output:
+SimpleEscrow expected output:
 ```
 (Pair (Pair "tz1Depositor" "tz1Beneficiary")
       (Pair 0          # state = INIT
@@ -158,7 +204,7 @@ smartpy originate-contract \
   --rpc https://ghostnet.tezos.marigold.dev
 ```
 
-### Execute Test Flow
+### Execute Test Flow (SimpleEscrow)
 
 ```bash
 # 1. Fund escrow
@@ -171,11 +217,30 @@ tezos-client run view get_status on contract KT1...
 tezos-client transfer 0 from alice to KT1... --entrypoint release
 ```
 
+### Execute Test Flow (MultiSigEscrow)
+
+```bash
+# 1. Fund escrow
+tezos-client transfer 5 from alice to KT1... --entrypoint fund
+
+# 2. Check voting status
+tezos-client run view get_votes on contract KT1...
+
+# 3. Vote to release (depositor)
+tezos-client transfer 0 from alice to KT1... --entrypoint vote_release
+
+# 4. Vote to release (beneficiary) - triggers consensus
+tezos-client transfer 0 from bob to KT1... --entrypoint vote_release
+
+# 5. Verify terminal state
+tezos-client run view get_status on contract KT1...
+```
+
 ## Mainnet Deployment
 
 ### Additional Precautions
 
-1. **Double-check addresses**: Verify depositor and beneficiary on mainnet explorer
+1. **Double-check addresses**: Verify depositor, beneficiary, and arbiter on mainnet explorer
 2. **Test on Ghostnet first**: Deploy identical contract on testnet
 3. **Verify compiled code**: Compare Michelson output
 4. **Start with small amount**: Test flow with minimal funds first
@@ -212,8 +277,11 @@ print(f"Can release: {status['can_release']}")
 # Fund escrow
 contract.fund().with_amount(5_000_000).send()
 
-# Release funds
+# Release funds (SimpleEscrow)
 contract.release().send()
+
+# Vote to release (MultiSigEscrow)
+contract.vote_release().send()
 
 # Force refund (after timeout)
 contract.force_refund().send()
@@ -242,8 +310,11 @@ operations = response.json()
 | ESCROW_ALREADY_FUNDED | Contract already funded | Check state before funding |
 | ESCROW_AMOUNT_MISMATCH | Wrong amount sent | Send exact escrow_amount |
 | ESCROW_NOT_DEPOSITOR | Wrong sender | Use depositor address |
-| ESCROW_TIMEOUT_NOT_EXPIRED | Deadline not passed | Wait for deadline |
+| ESCROW_TIMEOUT_NOT_EXPIRED | Deadline not reached | Wait for deadline |
 | ESCROW_DEADLINE_PASSED | Release window closed | Use force_refund instead |
+| ESCROW_SAME_PARTY | Duplicate addresses | Use different addresses for all parties |
+| CONSENSUS_ALREADY_EXECUTED | Consensus already triggered | Escrow already settled |
+| *_ALREADY_VOTED | Party already voted | Each party can only vote once |
 
 ### Verifying Transaction Success
 
