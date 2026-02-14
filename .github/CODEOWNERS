@@ -1,0 +1,23 @@
+# GitHub CODEOWNERS file
+# See https://help.github.com/articles/about-code-owners/
+
+# Core contract logic
+contracts/core/ @FortiEscrow/maintainers
+
+# Test framework
+tests/ @FortiEscrow/maintainers
+
+# Security and invariants
+contracts/interfaces/ @FortiEscrow/security-team
+
+# Documentation
+docs/ @FortiEscrow/maintainers
+
+# Configuration files
+.github/ @FortiEscrow/maintainers
+pyproject.toml @FortiEscrow/maintainers
+requirements.txt @FortiEscrow/maintainers
+
+# Root files
+README.md @FortiEscrow/maintainers
+LICENSE @FortiEscrow/maintainers

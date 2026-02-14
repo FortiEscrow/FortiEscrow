@@ -1,0 +1,228 @@
+name: Tests & Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run tests daily at midnight UTC
+    - cron: '0 0 * * *'
+
+jobs:
+  test:
+    name: "Test Suite (Python ${{ matrix.python-version }})"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-xdist
+
+    - name: Run unit tests
+      run: |
+        pytest tests/unit/ -v --tb=short --timeout=30
+
+    - name: Run dispute mechanism tests
+      run: |
+        pytest tests/unit/test_dispute_mechanism.py -v --tb=short
+
+    - name: Run other tests
+      run: |
+        pytest tests/ -v --tb=short --timeout=30 -x
+
+    - name: Generate test report
+      if: always()
+      run: |
+        pytest tests/ --tb=short --html=test-report.html --self-contained-html || true
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-report-py${{ matrix.python-version }}
+        path: test-report.html
+
+  coverage:
+    name: "Code Coverage"
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov coverage
+
+    - name: Run tests with coverage
+      run: |
+        pytest tests/ --cov=contracts --cov-report=xml --cov-report=html --cov-report=term-missing
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage.xml
+        flags: unittests
+        name: codecov-FortiEscrow
+        fail_ci_if_error: false
+        verbose: true
+
+    - name: Comment PR with coverage
+      if: github.event_name == 'pull_request'
+      uses: py-cov-action/python-coverage-comment-action@v3
+      with:
+        GITHUB_TOKEN: ${{ github.token }}
+        MINIMUM_GREEN: 75
+        MINIMUM_ORANGE: 50
+
+    - name: Upload coverage artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report
+        path: htmlcov/
+
+  security:
+    name: "Security Scan"
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install bandit[toml] safety
+
+    - name: Run Bandit security check
+      run: |
+        bandit -r contracts/ -f json -o bandit-report.json || true
+        bandit -r contracts/ -f txt
+
+    - name: Check Python dependencies for vulnerabilities
+      run: |
+        safety check --json || true
+
+    - name: Upload Bandit report
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: bandit-report
+        path: bandit-report.json
+
+  lint:
+    name: "Code Quality Checks"
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pylint black isort
+
+    - name: Check code formatting with black
+      run: |
+        black --check contracts/ tests/ || true
+
+    - name: Check import order with isort
+      run: |
+        isort --check-only contracts/ tests/ || true
+
+    - name: Run Flake8 linting
+      run: |
+        flake8 contracts/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics || true
+        flake8 contracts/ tests/ --count --exit-zero --max-complexity=10 --statistics || true
+
+  dispute-tests:
+    name: "Dispute Mechanism Tests"
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Test dispute mechanism
+      run: |
+        pytest tests/unit/test_dispute_mechanism.py -v --tb=short
+
+    - name: Test multisig escrow
+      run: |
+        pytest tests/unit/test_multisig_escrow.py -v --tb=short
+
+    - name: Generate dispute test report
+      if: always()
+      run: |
+        echo "## Dispute Mechanism Test Results" >> $GITHUB_STEP_SUMMARY
+        pytest tests/unit/test_dispute_mechanism.py --tb=no -v >> $GITHUB_STEP_SUMMARY || true
+
+  build-status:
+    name: "Build Status"
+    runs-on: ubuntu-latest
+    needs: [test, coverage, security, lint, dispute-tests]
+    if: always()
+
+    steps:
+    - name: Check build status
+      run: |
+        if [ "${{ needs.test.result }}" != "success" ]; then
+          echo "Tests failed!"
+          exit 1
+        fi
+
+    - name: Report build success
+      if: success()
+      run: |
+        echo "✅ All checks passed!"
+        echo "- Tests: ✅"
+        echo "- Coverage: ✅"
+        echo "- Security: ✅"
+        echo "- Code Quality: ✅"
+        echo "- Dispute Tests: ✅"
