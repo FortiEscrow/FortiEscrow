@@ -69,6 +69,17 @@ def mock_now():
 def mock_sender():
     return mock_address("tz1Default")
 
+def mock_mutez(n):
+    """Mock sp.mutez - returns amount in mutez"""
+    return n
+
+def mock_big_map(*args, **kwargs):
+    """Mock sp.big_map - returns a dict"""
+    if len(args) > 0:
+        # If called with tuples, convert to dict
+        return dict(args) if isinstance(args[0], tuple) else {}
+    return {}
+
 def mock_test_scenario():
     """Mock for sp.test_scenario()"""
     class TestScenario:
@@ -86,6 +97,9 @@ def mock_test_scenario():
         
         def h2(self, subtitle):
             print(f"\n  {subtitle}")
+        
+        def h3(self, subtitle):
+            print(f"\n  {subtitle}")
     
     return TestScenario()
 
@@ -98,6 +112,8 @@ sp.address = mock_address
 sp.nat = mock_nat
 sp.int = mock_int
 sp.timestamp = mock_timestamp
+sp.mutez = mock_mutez
+sp.big_map = mock_big_map
 sp.bool = mock_bool
 sp.string = mock_string
 sp.map = mock_map
@@ -115,6 +131,13 @@ def mock_TOption(typ):
     return type(f'Option[{typ}]', (), {})
 
 sp.TOption = mock_TOption
+
+# TList for type annotations
+def mock_TList(typ):
+    """Mock sp.TList - returns a type for list of values"""
+    return type(f'List[{typ}]', (), {})
+
+sp.TList = mock_TList
 
 # Record (variant) type - base class for smart contracts records
 class MockRecord(type):
@@ -154,6 +177,7 @@ sp.add_seconds = mock_add_seconds
 sp.now = property(lambda self: mock_now())
 
 sp.test_scenario = mock_test_scenario
+sp.test_context = mock_test_scenario  # test_context is similar to test_scenario
 sp.sender = mock_sender()
 
 # Entry point decorator (can be called with or without arguments)
@@ -276,6 +300,47 @@ def mock_verify(condition, message):
         raise AssertionError(f"SmartPy verify failed: {message}")
 
 sp.verify = mock_verify
+
+# local declaration for local variables in entry points
+class LocalVar:
+    """Mock for sp.local declarations"""
+    def __init__(self, **kwargs):
+        self.value = None
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+def mock_local(*args, **kwargs):
+    """Mock sp.local - handle both positional and keyword arguments"""
+    if len(args) > 0 and len(args) == 2:
+        # sp.local("name", value) format - create LocalVar with value attribute set
+        var = LocalVar()
+        var.value = args[1]
+        return var
+    elif len(args) > 0:
+        # sp.local(value) format
+        var = LocalVar()
+        var.value = args[0]
+        return var
+    elif len(kwargs) > 0:
+        # sp.local(**kwargs) format
+        return LocalVar(**kwargs)
+    return LocalVar()
+
+sp.local = mock_local
+
+# record function for creating records
+def mock_record(**kwargs):
+    """Mock sp.record - creates a record object"""
+    return LocalVar(**kwargs)
+
+sp.record = mock_record
+
+# result function for returning from views
+def mock_result(value):
+    """Mock sp.result - return value from view"""
+    return value
+
+sp.result = mock_result
 
 # Entry point wrapper to handle .run() calls
 class EntryPointWrapper:
@@ -464,6 +529,28 @@ class ContractData:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
+class DictWithAttributes:
+    """Wrapper that allows accessing dict keys as object attributes"""
+    def __init__(self, data):
+        object.__setattr__(self, '_data', data)
+    
+    def __getattr__(self, name):
+        data = object.__getattribute__(self, '_data')
+        if name in data:
+            return data[name]
+        raise AttributeError(f"No attribute {name}")
+    
+    def __setattr__(self, name, value):
+        if name == '_data':
+            object.__setattr__(self, name, value)
+        else:
+            data = object.__getattribute__(self, '_data')
+            data[name] = value
+    
+    def __repr__(self):
+        data = object.__getattribute__(self, '_data')
+        return f"DictWithAttributes({data})"
+
 # Update MockSmartPyContract to properly support init and entry point wrapping
 class MockSmartPyContract:
     """Minimal mock of sp.Contract base class with entry point support"""
@@ -483,6 +570,17 @@ class MockSmartPyContract:
             obj = object.__getattribute__(self, name)
         except AttributeError:
             return None
+        
+        # If it's a view method (starts with get_), call it directly and return result
+        if callable(obj) and name.startswith('get_') and not name.startswith('_'):
+            # View methods should be called directly and return their results
+            def view_call(*args, **kwargs):
+                result = obj(*args, **kwargs)
+                # Wrap dict results to allow attribute access
+                if isinstance(result, dict):
+                    return DictWithAttributes(result)
+                return result
+            return view_call
         
         # If it's an entry point method, wrap it
         if callable(obj) and not name.startswith('_') and name not in ['init', 'data']:
