@@ -5,14 +5,11 @@ This directory contains GitHub-specific configuration and workflows for the Fort
 ## 📁 Directory Structure
 
 ### `workflows/`
-Automated CI/CD pipelines that run on every push and pull request:
+Minimal but comprehensive CI/CD pipelines:
 
-- **`tests.yml`** - Run test suite across Python versions with coverage reporting
-- **`security.yml`** - CodeQL, Bandit, and dependency vulnerability scanning
-- **`codeql.yml`** - Advanced code analysis and security scanning
-- **`documentation.yml`** - Build and deploy documentation to GitHub Pages
-- **`release.yml`** - Automated release creation and changelog generation
-- **`pr-management.yml`** - Auto-label PRs by size and type
+- **`tests.yml`** - Test suite across Python 3.9/3.10/3.11 with coverage
+- **`codeql.yml`** - CodeQL analysis, security scanning, and dependency checking
+- **`release.yml`** - Automated release creation when tags are pushed
 
 ### `ISSUE_TEMPLATE/`
 GitHub issue templates for consistent issue reporting:
@@ -67,26 +64,17 @@ Runs on every push to main/develop and on PRs:
 **Status Badges:**
 ```markdown
 ![Tests](https://github.com/FortiEscrow/FortiEscrow/actions/workflows/tests.yml/badge.svg)
-![Security](https://github.com/FortiEscrow/FortiEscrow/actions/workflows/security.yml/badge.svg)
+![Security](https://github.com/FortiEscrow/FortiEscrow/actions/workflows/codeql.yml/badge.svg)
 ```
 
-### Security Scanning (`security.yml`)
+### Security Scanning (`codeql.yml`)
 
-Advanced security analysis:
+Comprehensive security analysis integrated with CodeQL workflow:
 
-- **CodeQL** - Detect security vulnerabilities in Python code
-- **Bandit** - Python security issue scanner
-- **Safety** - Dependency vulnerability checking
-- **Trivy** - Container and dependency scanning
-- **Semgrep** - Pattern-based static analysis
-
-### Documentation (`documentation.yml`)
-
-Automatic documentation building and deployment:
-
-- Validates Markdown syntax
-- Checks for broken links
-- Deploys to GitHub Pages on main branch updates
+- **CodeQL Analysis** - Detect security vulnerabilities in Python code
+- **Dependency Scanning** - Automated vulnerability checking with Safety
+- **Bandit Security** - Python-specific security issue detection
+- **SARIF Upload** - Results uploaded to GitHub Security tab
 
 ### Release Management (`release.yml`)
 
@@ -99,17 +87,8 @@ git push origin v1.0.0
 
 Automatically creates:
 - GitHub Release with tag
-- Changelog from commit messages
-- Release notes with test status
-
-### PR Management (`pr-management.yml`)
-
-Automatic PR labeling and validation:
-
-- Label by size: `size/small`, `size/medium`, `size/large`
-- Label by type: `type/feature`, `type/bug-fix`, `type/docs`, etc.
-- Validate commit message format
-- Add helpful PR comment with guidelines
+- Changelog generated from commit messages
+- Release notes with dependency and testing information
 
 ## ✅ Branch Protection Rules
 

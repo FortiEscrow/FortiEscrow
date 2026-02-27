@@ -177,7 +177,7 @@ When you submit a PR, these checks automatically run:
    - All test suites
    - Coverage reporting
 
-2. **Security** (`security.yml`)
+2. **Security** (integrated in `codeql.yml`)
    - CodeQL analysis
    - Bandit security scan
    - Dependency vulnerability check
@@ -187,7 +187,7 @@ When you submit a PR, these checks automatically run:
    - isort import sorting
    - Flake8 linting
 
-4. **Documentation** (`documentation.yml`)
+4. **Documentation** (maintained in `/docs` directory)
    - Markdown validation
    - Link checking
    - API doc generation
