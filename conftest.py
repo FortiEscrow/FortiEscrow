@@ -58,6 +58,16 @@ def mock_string(s):
 def mock_map(*args, **kwargs):
     return {}
 
+class MockBigMap(dict):
+    """Mock for sp.big_map - extends dict with SmartPy methods"""
+    def contains(self, key):
+        """Check if key exists in bigmap"""
+        return key in self
+    
+    def __getitem__(self, key):
+        """Get value from bigmap, or None if not present"""
+        return super().get(key, None)
+
 def mock_add_seconds(ts, seconds):
     # Handle both plain ints and property objects
     ts_val = ts.ts if hasattr(ts, 'ts') else ts
@@ -73,12 +83,24 @@ def mock_mutez(n):
     """Mock sp.mutez - returns amount in mutez"""
     return n
 
+def mock_tez(n):
+    """Mock sp.tez - converts from tez to mutez (1 tez = 1,000,000 mutez)"""
+    return n * 1_000_000 if isinstance(n, (int, float)) else 0
+
+# Counter for generating unique contract addresses
+_contract_counter = [0]
+
+def mock_create_contract(contract, amount, **kwargs):
+    """Mock sp.create_contract - returns a generated contract address"""
+    _contract_counter[0] += 1
+    return mock_address(f"tz1Contract{_contract_counter[0]:06d}")
+
 def mock_big_map(*args, **kwargs):
-    """Mock sp.big_map - returns a dict"""
+    """Mock sp.big_map - returns a MockBigMap dict"""
     if len(args) > 0:
         # If called with tuples, convert to dict
-        return dict(args) if isinstance(args[0], tuple) else {}
-    return {}
+        return MockBigMap(dict(args) if isinstance(args[0], tuple) else {})
+    return MockBigMap()
 
 def mock_test_scenario():
     """Mock for sp.test_scenario()"""
@@ -113,6 +135,8 @@ sp.nat = mock_nat
 sp.int = mock_int
 sp.timestamp = mock_timestamp
 sp.mutez = mock_mutez
+sp.tez = mock_tez
+sp.create_contract = mock_create_contract
 sp.big_map = mock_big_map
 sp.bool = mock_bool
 sp.string = mock_string
@@ -236,6 +260,9 @@ sp.to_int = lambda x: int(x)
 
 # len function
 sp.len = len
+
+# cons function - prepend element to list
+sp.cons = lambda head, tail: [head] + (list(tail) if isinstance(tail, list) else [])
 
 # if_ context manager for SmartPy conditional logic
 class IfContextManager:

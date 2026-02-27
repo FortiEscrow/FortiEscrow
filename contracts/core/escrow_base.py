@@ -633,7 +633,7 @@ class EscrowBase(sp.Contract):
         with sp.if_(self.data.state == STATE_REFUNDED):
             state_name.value = "REFUNDED"
 
-        sp.result(
+        return sp.result(
             sp.record(
                 state=self.data.state,
                 state_name=state_name.value,
@@ -656,7 +656,7 @@ class EscrowBase(sp.Contract):
     @sp.onchain_view()
     def get_parties(self):
         """Return escrow party addresses"""
-        sp.result(
+        return sp.result(
             sp.record(
                 depositor=self.data.depositor,
                 beneficiary=self.data.beneficiary
@@ -670,7 +670,7 @@ class EscrowBase(sp.Contract):
     @sp.onchain_view()
     def get_timeline(self):
         """Return escrow timeline information"""
-        sp.result(
+        return sp.result(
             sp.record(
                 funded_at=self.data.funded_at,
                 deadline=self.data.deadline,

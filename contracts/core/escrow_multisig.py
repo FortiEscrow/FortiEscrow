@@ -1207,7 +1207,7 @@ class MultiSigEscrow(sp.Contract):
     @sp.onchain_view()
     def get_parties(self):
         """Return all party addresses"""
-        sp.result(
+        return sp.result(
             sp.record(
                 depositor=self.data.depositor,
                 beneficiary=self.data.beneficiary,
