@@ -144,6 +144,11 @@ class EscrowFactory(sp.Contract):
 
         # ===== VALIDATION =====
 
+        # P-04: Reject attached XTZ — factory does not hold funds.
+        # Without this guard, any accidentally attached XTZ is permanently
+        # locked in the factory (no withdrawal mechanism exists).
+        sp.verify(sp.amount == sp.tez(0), EscrowError.AMOUNT_MISMATCH)
+
         # Sender is the depositor
         depositor = sp.sender
 
@@ -219,6 +224,24 @@ class EscrowFactory(sp.Contract):
         self.data.next_escrow_id = escrow_id + 1
         self.data.total_escrows = self.data.total_escrows + 1
         self.data.total_value_escrowed = self.data.total_value_escrowed + params.amount
+
+    # ==========================================================================
+    # DEFAULT ENTRY POINT: Reject Direct Transfers (P-05)
+    # ==========================================================================
+
+    @sp.entry_point
+    def default(self):
+        """
+        Reject all direct XTZ transfers to the factory.
+
+        SECURITY: The factory is a registry/factory contract only.
+        It must never hold funds. Without this guard, direct XTZ
+        transfers to the factory address are accepted and permanently
+        locked (factory has no withdrawal mechanism).
+
+        Mirrors the same protection in EscrowBase.default().
+        """
+        sp.failwith(EscrowError.DIRECT_TRANSFER_NOT_ALLOWED)
 
     # ==========================================================================
     # VIEW: get_escrow()

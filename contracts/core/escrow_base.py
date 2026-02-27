@@ -229,7 +229,7 @@ class EscrowBase(sp.Contract):
         """
         Check if timeout has expired (deadline reached or passed).
         
-        SEMANTIC: Returns True when deadline is AT or AFTER now.
+        SEMANTIC: Returns True when now is AT or AFTER deadline.
         This allows recovery as soon as deadline is reached, not after.
         
         Security: Prevents release() at exact deadline, allowing only force_refund().
@@ -615,10 +615,10 @@ class EscrowBase(sp.Contract):
 
         is_funded = self.data.state == STATE_FUNDED
         is_terminal = (self.data.state == STATE_RELEASED) | (self.data.state == STATE_REFUNDED)
-        timeout_expired = sp.now > self.data.deadline
+        timeout_expired = sp.now >= self.data.deadline  # P-02: >= matches force_refund() guard
 
         # Determine available actions
-        can_release = is_funded & (sp.now <= self.data.deadline)
+        can_release = is_funded & (sp.now < self.data.deadline)  # P-01: < matches release() guard
         can_refund = is_funded
         can_force_refund = is_funded & timeout_expired
 

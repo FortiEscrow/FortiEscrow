@@ -689,14 +689,17 @@ class MultiSigEscrow(sp.Contract):
         Effect: If 2+ votes for release, funds are released
 
         SECURITY:
-        - Each party can vote exactly once (enforced by per-voter voting locks)
-        - Voting locked once consensus executed
+        - Each party can vote (depositor, beneficiary, or arbiter)
+        - Voting locked once consensus executed (consensus_executed flag)
         - Once state exits FUNDED, voting rejected
-        - Vote change NOT allowed after initial vote (semantic commitment)
+        - Vote change IS allowed: party can switch from refund to release
+          (vote counts are adjusted; consensus is safe because _check_consensus
+          fires immediately after each vote and consensus_executed prevents re-run)
 
         VOTING INVARIANT:
-        Every party participates exactly once. Once voted (via this or vote_refund),
-        that party's position is locked for this escrow cycle.
+        A party may cast or change their vote at any time while state==FUNDED
+        and consensus has not yet been executed. Count integrity is maintained
+        by adjusting release_votes/refund_votes on vote change.
         """
 
         # [STATE CHECK] Must be funded
@@ -716,7 +719,7 @@ class MultiSigEscrow(sp.Contract):
         # Extract the actual address string for use as dict key
         voter_addr = str(voter)
 
-        # Track vote for lifecycle validation  
+        # Track vote for lifecycle validation
         # (allows vote changes -- vote counts handle the adjustment)
         # NOTE: Voting is allowed even during disputes. The arbiter can
         # participate in voting, helping achieve 2-of-3 consensus.
