@@ -21,7 +21,6 @@ GitHub issue templates for consistent issue reporting:
 
 - **`pull_request_template.md`** - PR template with checklist and guidelines
 - **`CODEOWNERS`** - Define code ownership and review requirements
-- **`dependabot.yml`** - Automated dependency and security updates
 
 ## 🚀 CI/CD Workflows
 
