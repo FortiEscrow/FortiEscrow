@@ -1,10 +1,11 @@
-# SmartPy - Install from source (not available on PyPI)
-# git clone https://github.com/smartpy-io/smartpy.git
-# cd smartpy && python3 -m pip install -e .
+# SmartPy (Tezos) is not on PyPI; the mock in conftest.py handles testing
+# without a real SmartPy installation. No smartpy install is required here.
 
 # Test dependencies
 pytest>=6.0.0
 pytest-cov>=2.10.0
+pytest-timeout>=2.0.0
+pytest-html>=3.0.0
 
 # Optional: Development tools
 black>=21.0

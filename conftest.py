@@ -9,7 +9,16 @@ provides enough of an interface to allow test collection and discovery.
 """
 
 import sys
+import types
 import pytest
+
+# Ensure smartpy module exists in sys.modules before any imports attempt it.
+# The installed 'smartpy' package on PyPI (v0.2.2) is a rainfall model, not
+# the Tezos SmartPy. We create a synthetic module so tests work regardless of
+# whether any 'smartpy' package is installed at all.
+if 'smartpy' not in sys.modules:
+    _sp_module = types.ModuleType('smartpy')
+    sys.modules['smartpy'] = _sp_module
 
 # Create a minimal SmartPy mock to allow imports
 class MockSmartPyContract:
